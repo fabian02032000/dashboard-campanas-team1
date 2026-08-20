@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard de Campañas — Meta & TikTok</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div>Cargando datos del Google Sheet…</div>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>📊 Dashboard de Gestión — Meta &amp; TikTok</h1>
+      <div class="sub">Leads, ventas y efectividad del equipo, en vivo desde el Google Sheet</div>
+      <div id="status-line">—</div>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-refresh">↻ Actualizar</button>
+      <button class="icon-btn" id="btn-theme">🌓 Tema</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <label>Plataforma
+      <select id="f-platform">
+        <option value="Todos">Todas</option>
+        <option value="Meta">Meta</option>
+        <option value="TikTok">TikTok</option>
+      </select>
+    </label>
+    <label>Mes
+      <select id="f-month">
+        <option value="Todos">Todos</option>
+      </select>
+    </label>
+    <label>Asesor
+      <select id="f-asesor">
+        <option value="Todos">Todos</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="error-holder"></div>
+  <div id="content" style="display:none">
+
+    <h2 class="section-title">Resumen general</h2>
+    <div class="kpi-grid" id="kpi-general"></div>
+
+    <h2 class="section-title">Resumen mensual <span class="hint">leads ingresados vs. vendidos, por mes</span> <span class="hint" id="monthly-caveat"></span></h2>
+    <div class="panel">
+      <div class="chart-box"><canvas id="chart-monthly"></canvas></div>
+    </div>
+    <div class="panel table-scroll" style="margin-top:12px">
+      <table class="data-table" id="table-monthly"></table>
+    </div>
+
+    <h2 class="section-title">Tipificaciones <span class="hint">cómo se cerraron los leads gestionados</span></h2>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="chart-box"><canvas id="chart-tipif"></canvas></div>
+      </div>
+      <div class="panel">
+        <ul class="legend-list" id="legend-tipif"></ul>
+      </div>
+    </div>
+
+    <h2 class="section-title">Ranking y efectividad por asesor</h2>
+    <div class="panel">
+      <div class="chart-box short"><canvas id="chart-asesor"></canvas></div>
+    </div>
+    <div class="panel table-scroll" style="margin-top:12px">
+      <table class="data-table" id="table-asesor"></table>
+    </div>
+
+  </div>
+
+  <footer class="foot">
+    <span>Fuente: Google Sheet (pestañas de leads Meta/TikTok + resumen de inversión).</span>
+    <span id="footer-updated"></span>
+  </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="metrics.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
