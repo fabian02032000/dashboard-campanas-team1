@@ -5,7 +5,7 @@ const CONFIG = {
   AUTO_REFRESH_MINUTES: 10,
   LEAD_SHEETS: [
     { name: "LEADS TIKTOK V.2", platform: "TikTok", cols: { asesor: "ASESOR", supervisor: "SUPERVISOR", statusGestion: "Status Gestión", tipificacion: "estaus", qtyVenta: "QTY Venta", planVendido: "Plan Vendido", canalVenta: "Canal de venta", remarketing: "Remarketing", fecha: "Fecha", anio: "Año", mes: "Mes " } },
-    { name: "SALES REVOLUTION | LEADS META |", platform: "Meta", cols: { asesor: "ASESOR", supervisor: "SUPERVISOR", statusGestion: "Status Gestión", tipificacion: "estaus", qtyVenta: "QTY Venta", planVendido: "Plan Vendido", canalVenta: "Canal de venta", remarketing: "Remarketing", fecha: "created_time", anio: "Año", mes: "Mes " } },
+    { name: "SALES REVOLUTION | LEADS META | FILTROS", platform: "Meta", cols: { asesor: "ASESOR", supervisor: "SUPERVISOR", statusGestion: "Status Gestión", tipificacion: "estaus", qtyVenta: "QTY Venta", planVendido: "Plan Vendido", canalVenta: "Canal de venta", remarketing: "Remarketing", fecha: "created_time", anio: "Año", mes: "Mes " } },
     { name: "SALES REVOLUTION | LEADS META", platform: "Meta", cols: { asesor: "ASESOR", supervisor: "SUPERVISOR", statusGestion: "Status Gestión", tipificacion: "Observaciones", qtyVenta: "QTY Venta", planVendido: "Plan Vendido", canalVenta: "Canal de venta", remarketing: "Remarketing", fecha: "Fecha", anio: "Año", mes: "Mes " } },
     { name: "LEADS TIKTOK SR", platform: "TikTok", cols: { asesor: "Vendedor Asignado", supervisor: "SUPERVISOR", statusGestion: "Status Gestión", tipificacion: "Observaciones", qtyVenta: "QTY Venta", planVendido: "Plan Vendido", canalVenta: "Canal de venta", remarketing: "Remarketing", fecha: "Fecha", anio: "Año", mes: "Mes " } },
   ],
