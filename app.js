@@ -1,9 +1,3 @@
-// ============================================================================
-// Render del dashboard: toma los datos ya calculados (metrics.js) y pinta
-// KPIs, gráficos (Chart.js) y tablas. Se re-ejecuta cada vez que cambia un
-// filtro, sin volver a pedir datos al Sheet.
-// ============================================================================
-
 let DASHBOARD_DATA = null;
 let charts = {};
 
@@ -18,8 +12,6 @@ function seriesColor(i) {
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
-
-// ---- filtros -----------------------------------------------------------
 
 function currentFilters() {
   return {
@@ -49,8 +41,6 @@ function populateFilterOptions() {
   });
 }
 
-// ---- KPIs generales ------------------------------------------------------
-
 function renderGeneralKpis(k) {
   const tiles = [
     ["Leads ingresados", fmtInt(k.leadsIngresados), null],
@@ -75,8 +65,6 @@ function renderGeneralKpis(k) {
     )
     .join("");
 }
-
-// ---- resumen mensual -----------------------------------------------------
 
 function renderMonthly(rows) {
   const ctx = document.getElementById("chart-monthly");
@@ -151,8 +139,6 @@ function renderMonthly(rows) {
     </tbody>`;
 }
 
-// ---- torta de tipificaciones ----------------------------------------------
-
 function renderTipificaciones(rows) {
   const ctx = document.getElementById("chart-tipif");
   const colors = rows.map((r, i) => (r.isOther ? cssVar("--text-muted") : seriesColor(i)));
@@ -189,8 +175,6 @@ function renderTipificaciones(rows) {
     )
     .join("");
 }
-
-// ---- ranking por asesor -----------------------------------------------------
 
 function renderAsesores(rows) {
   const ctx = document.getElementById("chart-asesor");
@@ -261,8 +245,6 @@ function renderAsesores(rows) {
     </tbody>`;
 }
 
-// ---- orquestación ----------------------------------------------------------
-
 function renderAll() {
   const filters = currentFilters();
   renderGeneralKpis(computeGeneralSummary(DASHBOARD_DATA, filters));
@@ -299,6 +281,12 @@ async function loadAndRender() {
     const label = now.toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
     setStatus(`Actualizado: ${label} · ${DASHBOARD_DATA.leads.length.toLocaleString("es-PE")} leads cargados`);
     document.getElementById("footer-updated").textContent = `Última carga: ${label}`;
+
+    const missing = await getMissingSheets();
+    if (missing.length) {
+      document.getElementById("error-holder").innerHTML =
+        `<div class="error-box">⚠️ No se encontró ${missing.length === 1 ? "esta pestaña" : "estas pestañas"} en el Sheet — sus leads NO están contados arriba: ${missing.map((m) => `"${m}"`).join(", ")}. Revisa que el nombre en config.js coincida exactamente con el nombre real de la pestaña.</div>`;
+    }
   } catch (err) {
     console.error(err);
     setStatus("Error al cargar datos", true);
@@ -308,8 +296,6 @@ async function loadAndRender() {
   }
 }
 
-// ---- tema claro/oscuro ------------------------------------------------------
-
 function initTheme() {
   const saved = localStorage.getItem("dashboard-theme");
   if (saved) document.documentElement.setAttribute("data-theme", saved);
@@ -318,11 +304,9 @@ function initTheme() {
     const next = cur === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("dashboard-theme", next);
-    renderAll(); // los charts leen colores de CSS vars, hay que repintarlos
+    renderAll();
   });
 }
-
-// ---- init ---------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
