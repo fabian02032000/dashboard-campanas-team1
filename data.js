@@ -1,10 +1,3 @@
-// ============================================================================
-// ETL: descarga las hojas del Google Sheet, las normaliza y calcula todas las
-// métricas que usa el dashboard. No toca el DOM — solo devuelve datos listos.
-// ============================================================================
-
-// ---- utilidades básicas ----------------------------------------------------
-
 function cleanText(v) {
   if (v === null || v === undefined) return "";
   return String(v).replace(/\s+/g, " ").trim();
@@ -23,8 +16,6 @@ function parseNumber(v) {
   return isFinite(n) ? n : null;
 }
 
-// Construye una fecha (UTC-neutral, solo Y-M-D) a partir de Año/Mes/Dia, o si
-// no hay, intenta parsear el string de Fecha directamente.
 function buildDate(anioRaw, mesRaw, diaRaw, fechaRaw) {
   const anio = parseInt(anioRaw, 10);
   const mes = parseInt(mesRaw, 10);
@@ -34,13 +25,10 @@ function buildDate(anioRaw, mesRaw, diaRaw, fechaRaw) {
   }
   if (fechaRaw) {
     const s = String(fechaRaw).trim();
-    // ISO con offset: 2026-05-19T15:34:23-05:00
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    // M/D/YYYY [hh:mm:ss]
     m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return new Date(Date.UTC(+m[3], +m[1] - 1, +m[2]));
-    // gviz Date(y,m,d,...)
     m = s.match(/^Date\((\d+),(\d+),(\d+)/);
     if (m) return new Date(Date.UTC(+m[1], +m[2], +m[3]));
     const d = new Date(s);
@@ -54,37 +42,34 @@ function monthKey(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-// ---- descarga + parseo CSV -------------------------------------------------
+let _payloadCache = null;
 
-async function fetchSheetRows(sheetName) {
-  const url = csvUrlForSheet(sheetName);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`No se pudo leer la pestaña "${sheetName}" (HTTP ${res.status}). ¿Está compartida como "Cualquiera con el enlace: Lector"?`);
+async function fetchAppsScriptPayload() {
+  if (_payloadCache) return _payloadCache;
+  if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) {
+    throw new Error("Falta configurar APPS_SCRIPT_URL en config.js (ver AppsScript_Code.gs).");
   }
-  const text = await res.text();
-  const parsed = Papa.parse(text, { header: false, skipEmptyLines: false });
-  return parsed.data; // array de arrays (filas x columnas), tal cual el sheet
+  const res = await fetch(appsScriptUrl(), { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`No se pudo contactar el Apps Script (HTTP ${res.status}). Revisa que esté implementado como "Aplicación web" con acceso "Cualquier usuario".`);
+  }
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(`El Apps Script rechazó la petición: ${json.error}. Revisa que APPS_SCRIPT_TOKEN coincida con SECRET_TOKEN en el script.`);
+  }
+  _payloadCache = json;
+  return json;
 }
 
 async function fetchSheetAsObjects(sheetName) {
-  const rows = await fetchSheetRows(sheetName);
-  if (!rows.length) return [];
-  const headers = rows[0].map((h) => cleanText(h));
-  const out = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.every((c) => cleanText(c) === "")) continue;
-    const obj = {};
-    headers.forEach((h, idx) => {
-      if (h) obj[h] = row[idx];
-    });
-    out.push(obj);
-  }
-  return out;
+  const payload = await fetchAppsScriptPayload();
+  return payload.leadSheets[sheetName] || [];
 }
 
-// ---- normalización de leads -------------------------------------------------
+async function fetchSheetRows(sheetName) {
+  const payload = await fetchAppsScriptPayload();
+  return payload.resumenSheets[sheetName] || [];
+}
 
 const TIPIF_VENTA_PREFIX = "VENTA";
 const ESTADOS_GESTION_VALIDOS = new Set(["CONTACTO", "NO CONTACTO"]);
@@ -111,7 +96,7 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
       sourceSheet: sheetCfg.name,
       asesor,
       supervisor,
-      statusGestion, // 'CONTACTO' | 'NO CONTACTO' | null (sin gestionar)
+      statusGestion,
       gestionado: statusGestion !== null,
       contactado: statusGestion === "CONTACTO",
       tipificacion,
@@ -137,17 +122,13 @@ async function loadAllLeads() {
   return all;
 }
 
-// ---- parseo de hojas RESUMEN (inversión mensual) ---------------------------
-// Formato: bloques de 3 columnas [Etiqueta, Valor, (vacío)] repetidos. Fila 0
-// trae el título de cada bloque (mes), filas siguientes traen métrica/valor.
-
 function parseResumenSheet(rows2D, platform) {
   if (!rows2D.length) return [];
   const headerRow = rows2D[0];
   const numBlocks = Math.ceil(headerRow.length / 3);
-  const out = []; // { platform, mes(1-12), inversion, leadsReportado, ventasReportado }
+  const out = [];
 
-  for (let b = 1; b < numBlocks; b++) { // b=0 es "RESUMEN GENERAL" (total), lo saltamos
+  for (let b = 1; b < numBlocks; b++) {
     const titulo = cleanText(headerRow[b * 3]);
     if (!titulo) continue;
     const mesMatch = Object.keys(CONFIG.MESES).find((m) =>
@@ -189,9 +170,8 @@ async function loadInversion() {
   return all;
 }
 
-// ---- carga completa ---------------------------------------------------------
-
 async function loadDashboardData() {
+  _payloadCache = null;
   const [leads, inversion] = await Promise.all([loadAllLeads(), loadInversion()]);
   return { leads, inversion, loadedAt: new Date() };
 }
