@@ -61,6 +61,11 @@ async function fetchAppsScriptPayload() {
   return json;
 }
 
+async function getMissingSheets() {
+  const payload = await fetchAppsScriptPayload();
+  return payload.missingSheets || [];
+}
+
 async function fetchSheetAsObjects(sheetName) {
   const payload = await fetchAppsScriptPayload();
   return payload.leadSheets[sheetName] || [];
@@ -86,6 +91,8 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
     const tipificacion = tipRaw || null;
     const isVenta = !!tipRaw && upper(tipRaw).startsWith(TIPIF_VENTA_PREFIX);
     const planVendido = parseNumber(r[c.planVendido]);
+    const qtyRaw = parseNumber(r[c.qtyVenta]);
+    const unidades = !isVenta ? 0 : Number.isInteger(qtyRaw) && qtyRaw >= 1 && qtyRaw <= 20 ? qtyRaw : 1;
     const canalVenta = cleanText(r[c.canalVenta]) || null;
     const remarketing = upper(r[c.remarketing]) === "SÍ" || upper(r[c.remarketing]) === "SI";
     const date = buildDate(r[c.anio], r[c.mes], r["Dia"], r[c.fecha]);
@@ -102,6 +109,7 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
       tipificacion,
       isVenta,
       planVendido,
+      unidades,
       canalVenta,
       remarketing,
       date,
