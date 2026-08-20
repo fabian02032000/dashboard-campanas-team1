@@ -46,12 +46,12 @@ function renderGeneralKpis(k) {
     ["Leads ingresados", fmtInt(k.leadsIngresados), null],
     ["Leads gestionados", fmtInt(k.gestionados), `${fmtPct(k.pctGestion)} del total`],
     ["Contactados", fmtInt(k.contacto), `${fmtPct(k.pctContacto)} de gestionados`],
-    ["Leads vendidos", fmtInt(k.ventas), `${fmtPct(k.vendidoPorContacto)} de contactados`],
+    ["Ventas (clientes)", fmtInt(k.ventas), `${fmtPct(k.vendidoPorContacto)} de contactados`],
+    ["Unidades vendidas", fmtInt(k.unidadesVendidas), "líneas totales (multi cuenta 2, 3…)"],
     ["CVR", fmtPct(k.cvr), "ventas / leads"],
     ["CPL", fmtMoney(k.cpl), "inversión / lead"],
-    ["CPA", fmtMoney(k.cpa), "inversión / venta"],
+    ["CPA", fmtMoney(k.cpa), "inversión / unidad vendida"],
     ["Inversión", fmtMoney(k.inversion), null],
-    ["Monto vendido", fmtMoney(k.montoVendido), `ticket prom. ${fmtMoney(k.ticketPromedio)}`],
   ];
   const el = document.getElementById("kpi-general");
   el.innerHTML = tiles
@@ -113,7 +113,7 @@ function renderMonthly(rows) {
   const table = document.getElementById("table-monthly");
   table.innerHTML = `
     <thead><tr>
-      <th class="left">Mes</th><th>Leads</th><th>Gestión.</th><th>Contacto</th><th>Ventas</th>
+      <th class="left">Mes</th><th>Leads</th><th>Gestión.</th><th>Contacto</th><th>Ventas</th><th>Unidades</th>
       <th>% Gestión</th><th>% Contacto</th><th>CVR</th><th>Vendido/Contacto</th>
       <th>Inversión</th><th>CPL</th><th>CPA</th>
     </tr></thead>
@@ -126,6 +126,7 @@ function renderMonthly(rows) {
             <td>${fmtInt(r.gestionados)}</td>
             <td>${fmtInt(r.contacto)}</td>
             <td>${fmtInt(r.ventas)}</td>
+            <td>${fmtInt(r.unidadesVendidas)}</td>
             <td>${fmtPct(r.pctGestion)}</td>
             <td>${fmtPct(r.pctContacto)}</td>
             <td>${fmtPct(r.cvr)}</td>
@@ -133,6 +134,61 @@ function renderMonthly(rows) {
             <td>${fmtMoney(r.inversion)}</td>
             <td>${fmtMoney(r.cpl)}</td>
             <td>${fmtMoney(r.cpa)}</td>
+          </tr>`
+        )
+        .join("")}
+    </tbody>`;
+}
+
+function renderPlanRanking(rows) {
+  const ctx = document.getElementById("chart-plan");
+  if (charts.plan) charts.plan.destroy();
+  charts.plan = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: rows.map((r) => r.label),
+      datasets: [
+        {
+          label: "Ventas",
+          data: rows.map((r) => r.ventas),
+          backgroundColor: cssVar("--series-3"),
+          borderRadius: 4,
+          maxBarThickness: 48,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const r = rows[c.dataIndex];
+              return [`Ventas: ${fmtInt(r.ventas)} (${fmtPct(r.pctVentas)})`, `Unidades: ${fmtInt(r.unidades)}`];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: cssVar("--text-muted") }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: cssVar("--text-muted") }, grid: { color: cssVar("--gridline") } },
+      },
+    },
+  });
+
+  const table = document.getElementById("table-plan");
+  table.innerHTML = `
+    <thead><tr><th class="left">Plan</th><th>Ventas (clientes)</th><th>% de ventas</th><th>Unidades</th></tr></thead>
+    <tbody>
+      ${rows
+        .map(
+          (r) => `<tr>
+            <td class="left">${r.label}</td>
+            <td>${fmtInt(r.ventas)}</td>
+            <td>${fmtPct(r.pctVentas)}</td>
+            <td>${fmtInt(r.unidades)}</td>
           </tr>`
         )
         .join("")}
@@ -219,7 +275,7 @@ function renderAsesores(rows) {
   table.innerHTML = `
     <thead><tr>
       <th class="left">#</th><th class="left">Asesor</th><th class="left">Supervisor</th>
-      <th>Leads</th><th>Gestión.</th><th>Contacto</th><th>Ventas</th>
+      <th>Leads</th><th>Gestión.</th><th>Contacto</th><th>Ventas</th><th>Unidades</th>
       <th>% Gestión</th><th>% Contacto</th><th>CVR</th>
       <th>Efect. (vs gestión.)</th><th>Vendido/Contacto</th>
     </tr></thead>
@@ -234,6 +290,7 @@ function renderAsesores(rows) {
             <td>${fmtInt(r.gestionados)}</td>
             <td>${fmtInt(r.contacto)}</td>
             <td>${fmtInt(r.ventas)}</td>
+            <td>${fmtInt(r.unidadesVendidas)}</td>
             <td>${fmtPct(r.pctGestion)}</td>
             <td>${fmtPct(r.pctContacto)}</td>
             <td>${fmtPct(r.cvr)}</td>
@@ -250,6 +307,7 @@ function renderAll() {
   renderGeneralKpis(computeGeneralSummary(DASHBOARD_DATA, filters));
   renderMonthly(computeMonthlySummary(DASHBOARD_DATA, filters));
   renderTipificaciones(computeTipificaciones(DASHBOARD_DATA, filters));
+  renderPlanRanking(computePlanRanking(DASHBOARD_DATA, filters));
   renderAsesores(computeAsesorRanking(DASHBOARD_DATA, filters));
 
   const sinFecha = applyFilters(DASHBOARD_DATA.leads, { platform: filters.platform, asesor: filters.asesor }).filter(
