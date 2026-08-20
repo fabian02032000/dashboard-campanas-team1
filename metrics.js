@@ -1,8 +1,3 @@
-// ============================================================================
-// Cálculo de métricas a partir de los leads normalizados + inversión mensual.
-// Todo recibe los datos ya cargados (data.js) y un objeto de filtros opcional.
-// ============================================================================
-
 function applyFilters(leads, filters) {
   return leads.filter((l) => {
     if (filters.platform && filters.platform !== "Todos" && l.platform !== filters.platform) return false;
@@ -35,7 +30,7 @@ function baseKpis(leads, inversionRows) {
   const contacto = leads.filter((l) => l.contactado).length;
   const noContacto = leads.filter((l) => l.statusGestion === "NO CONTACTO").length;
   const ventas = leads.filter((l) => l.isVenta).length;
-  const montoVendido = sum(leads.filter((l) => l.isVenta).map((l) => l.planVendido || 0));
+  const unidadesVendidas = sum(leads.filter((l) => l.isVenta).map((l) => l.unidades));
   const inversion = sum(inversionRows.map((r) => r.inversion));
 
   return {
@@ -44,7 +39,7 @@ function baseKpis(leads, inversionRows) {
     contacto,
     noContacto,
     ventas,
-    montoVendido,
+    unidadesVendidas,
     inversion,
     pctGestion: safeDiv(gestionados, leadsIngresados),
     pctContacto: safeDiv(contacto, gestionados),
@@ -52,8 +47,7 @@ function baseKpis(leads, inversionRows) {
     vendidoPorContacto: safeDiv(ventas, contacto),
     efectividadGestion: safeDiv(ventas, gestionados),
     cpl: safeDiv(inversion, leadsIngresados),
-    cpa: safeDiv(inversion, ventas),
-    ticketPromedio: safeDiv(montoVendido, ventas),
+    cpa: safeDiv(inversion, unidadesVendidas),
   };
 }
 
@@ -84,7 +78,7 @@ function computeMonthlySummary(data, filters) {
   return rows;
 }
 
-const MAX_TIPIF_SLICES = 7; // + "Otras" = 8, coincide con las 8 posiciones de la paleta
+const MAX_TIPIF_SLICES = 7;
 
 function computeTipificaciones(data, filters) {
   const leads = applyFilters(data.leads, filters).filter((l) => l.tipificacion);
@@ -115,7 +109,7 @@ function computeAsesorRanking(data, filters) {
   const rows = Array.from(byAsesor.entries())
     .filter(([asesor]) => asesor !== "Sin asignar")
     .map(([asesor, group]) => {
-      const kpis = baseKpis(group, []); // la inversión no se prorratea por asesor
+      const kpis = baseKpis(group, []);
       const supervisores = new Set(group.map((l) => l.supervisor));
       return {
         asesor,
@@ -124,6 +118,27 @@ function computeAsesorRanking(data, filters) {
       };
     });
 
+  rows.sort((a, b) => b.ventas - a.ventas);
+  return rows;
+}
+
+function computePlanRanking(data, filters) {
+  const leads = applyFilters(data.leads, filters).filter((l) => l.isVenta);
+  const byPlan = new Map();
+  leads.forEach((l) => {
+    const key = l.planVendido !== null && l.planVendido !== undefined ? l.planVendido : "__sin_plan__";
+    if (!byPlan.has(key)) byPlan.set(key, { plan: key, ventas: 0, unidades: 0 });
+    const g = byPlan.get(key);
+    g.ventas += 1;
+    g.unidades += l.unidades || 0;
+  });
+  const totalVentas = leads.length;
+  const rows = Array.from(byPlan.values()).map((g) => ({
+    label: g.plan === "__sin_plan__" ? "Sin plan registrado" : `S/ ${g.plan}`,
+    ventas: g.ventas,
+    unidades: g.unidades,
+    pctVentas: safeDiv(g.ventas, totalVentas),
+  }));
   rows.sort((a, b) => b.ventas - a.ventas);
   return rows;
 }
