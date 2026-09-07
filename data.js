@@ -1,3 +1,10 @@
+// ============================================================================
+// ETL: descarga las hojas del Google Sheet, las normaliza y calcula todas las
+// métricas que usa el dashboard. No toca el DOM — solo devuelve datos listos.
+// ============================================================================
+
+// ---- utilidades básicas ----------------------------------------------------
+
 function cleanText(v) {
   if (v === null || v === undefined) return "";
   return String(v).replace(/\s+/g, " ").trim();
@@ -16,6 +23,8 @@ function parseNumber(v) {
   return isFinite(n) ? n : null;
 }
 
+// Construye una fecha (UTC-neutral, solo Y-M-D) a partir de Año/Mes/Dia, o si
+// no hay, intenta parsear el string de Fecha directamente.
 function buildDate(anioRaw, mesRaw, diaRaw, fechaRaw) {
   const anio = parseInt(anioRaw, 10);
   const mes = parseInt(mesRaw, 10);
@@ -25,10 +34,13 @@ function buildDate(anioRaw, mesRaw, diaRaw, fechaRaw) {
   }
   if (fechaRaw) {
     const s = String(fechaRaw).trim();
+    // ISO con offset: 2026-05-19T15:34:23-05:00
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    // M/D/YYYY [hh:mm:ss]
     m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return new Date(Date.UTC(+m[3], +m[1] - 1, +m[2]));
+    // gviz Date(y,m,d,...)
     m = s.match(/^Date\((\d+),(\d+),(\d+)/);
     if (m) return new Date(Date.UTC(+m[1], +m[2], +m[3]));
     const d = new Date(s);
@@ -41,6 +53,11 @@ function monthKey(date) {
   if (!date) return null;
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
+
+// ---- descarga desde el Apps Script privado ---------------------------------
+// Un solo fetch trae TODO (las 4 hojas de leads ya sin PII + las 2 hojas
+// resumen). El Sheet en sí puede quedar 100% "Restringido": este es el único
+// punto de entrada, y exige la clave secreta.
 
 let _payloadCache = null;
 
@@ -61,6 +78,9 @@ async function fetchAppsScriptPayload() {
   return json;
 }
 
+// Nombres de pestañas configuradas que el Apps Script no pudo encontrar en el
+// Sheet (fallo silencioso evitado: se lo mostramos al usuario en vez de
+// simplemente devolver menos leads sin avisar).
 async function getMissingSheets() {
   const payload = await fetchAppsScriptPayload();
   return payload.missingSheets || [];
@@ -75,6 +95,8 @@ async function fetchSheetRows(sheetName) {
   const payload = await fetchAppsScriptPayload();
   return payload.resumenSheets[sheetName] || [];
 }
+
+// ---- normalización de leads -------------------------------------------------
 
 const TIPIF_VENTA_PREFIX = "VENTA";
 const ESTADOS_GESTION_VALIDOS = new Set(["CONTACTO", "NO CONTACTO"]);
@@ -91,6 +113,10 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
     const tipificacion = tipRaw || null;
     const isVenta = !!tipRaw && upper(tipRaw).startsWith(TIPIF_VENTA_PREFIX);
     const planVendido = parseNumber(r[c.planVendido]);
+    // Unidades (líneas) vendidas en este lead. "QTY Venta" trae el número de
+    // líneas en ventas multi (2, 3, 4...), pero el campo tiene datos sucios
+    // en el Sheet (fechas, texto suelto) — solo se confía si es un entero
+    // razonable (1-20); si no, una venta cuenta como 1 unidad por defecto.
     const qtyRaw = parseNumber(r[c.qtyVenta]);
     const unidades = !isVenta ? 0 : Number.isInteger(qtyRaw) && qtyRaw >= 1 && qtyRaw <= 20 ? qtyRaw : 1;
     const canalVenta = cleanText(r[c.canalVenta]) || null;
@@ -98,12 +124,20 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
     const date = buildDate(r[c.anio], r[c.mes], r["Dia"], r[c.fecha]);
     const mk = monthKey(date);
 
+    // Nombre del anuncio / conjunto de anuncios / campaña de donde vino el
+    // lead (Meta y TikTok usan nombres de columna distintos, ya mapeados en
+    // config.js). No son datos del cliente, así que se pueden mostrar tal
+    // cual en el dashboard.
+    const adNombre = cleanText(r[c.adNombre]) || "Sin anuncio";
+    const adsetNombre = cleanText(r[c.adsetNombre]) || "Sin conjunto";
+    const campanaNombre = cleanText(r[c.campanaNombre]) || "Sin campaña";
+
     out.push({
       platform: sheetCfg.platform,
       sourceSheet: sheetCfg.name,
       asesor,
       supervisor,
-      statusGestion,
+      statusGestion, // 'CONTACTO' | 'NO CONTACTO' | null (sin gestionar)
       gestionado: statusGestion !== null,
       contactado: statusGestion === "CONTACTO",
       tipificacion,
@@ -112,6 +146,9 @@ function normalizeLeadSheet(sheetCfg, rawRows) {
       unidades,
       canalVenta,
       remarketing,
+      adNombre,
+      adsetNombre,
+      campanaNombre,
       date,
       monthKey: mk,
     });
@@ -130,13 +167,17 @@ async function loadAllLeads() {
   return all;
 }
 
+// ---- parseo de hojas RESUMEN (inversión mensual) ---------------------------
+// Formato: bloques de 3 columnas [Etiqueta, Valor, (vacío)] repetidos. Fila 0
+// trae el título de cada bloque (mes), filas siguientes traen métrica/valor.
+
 function parseResumenSheet(rows2D, platform) {
   if (!rows2D.length) return [];
   const headerRow = rows2D[0];
   const numBlocks = Math.ceil(headerRow.length / 3);
-  const out = [];
+  const out = []; // { platform, mes(1-12), inversion, leadsReportado, ventasReportado }
 
-  for (let b = 1; b < numBlocks; b++) {
+  for (let b = 1; b < numBlocks; b++) { // b=0 es "RESUMEN GENERAL" (total), lo saltamos
     const titulo = cleanText(headerRow[b * 3]);
     if (!titulo) continue;
     const mesMatch = Object.keys(CONFIG.MESES).find((m) =>
@@ -178,8 +219,10 @@ async function loadInversion() {
   return all;
 }
 
+// ---- carga completa ---------------------------------------------------------
+
 async function loadDashboardData() {
-  _payloadCache = null;
+  _payloadCache = null; // fuerza a volver a pedirle datos frescos al Apps Script
   const [leads, inversion] = await Promise.all([loadAllLeads(), loadInversion()]);
   return { leads, inversion, loadedAt: new Date() };
 }

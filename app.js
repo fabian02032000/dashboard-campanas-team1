@@ -1,3 +1,9 @@
+// ============================================================================
+// Render del dashboard: toma los datos ya calculados (metrics.js) y pinta
+// KPIs, gráficos (Chart.js) y tablas. Se re-ejecuta cada vez que cambia un
+// filtro, sin volver a pedir datos al Sheet.
+// ============================================================================
+
 let DASHBOARD_DATA = null;
 let charts = {};
 
@@ -12,6 +18,8 @@ function seriesColor(i) {
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
+
+// ---- filtros -----------------------------------------------------------
 
 function currentFilters() {
   return {
@@ -41,6 +49,8 @@ function populateFilterOptions() {
   });
 }
 
+// ---- KPIs generales ------------------------------------------------------
+
 function renderGeneralKpis(k) {
   const tiles = [
     ["Leads ingresados", fmtInt(k.leadsIngresados), null],
@@ -65,6 +75,8 @@ function renderGeneralKpis(k) {
     )
     .join("");
 }
+
+// ---- resumen mensual -----------------------------------------------------
 
 function renderMonthly(rows) {
   const ctx = document.getElementById("chart-monthly");
@@ -140,6 +152,8 @@ function renderMonthly(rows) {
     </tbody>`;
 }
 
+// ---- plan más vendido -------------------------------------------------------
+
 function renderPlanRanking(rows) {
   const ctx = document.getElementById("chart-plan");
   if (charts.plan) charts.plan.destroy();
@@ -195,6 +209,8 @@ function renderPlanRanking(rows) {
     </tbody>`;
 }
 
+// ---- torta de tipificaciones ----------------------------------------------
+
 function renderTipificaciones(rows) {
   const ctx = document.getElementById("chart-tipif");
   const colors = rows.map((r, i) => (r.isOther ? cssVar("--text-muted") : seriesColor(i)));
@@ -231,6 +247,8 @@ function renderTipificaciones(rows) {
     )
     .join("");
 }
+
+// ---- ranking por asesor -----------------------------------------------------
 
 function renderAsesores(rows) {
   const ctx = document.getElementById("chart-asesor");
@@ -302,6 +320,85 @@ function renderAsesores(rows) {
     </tbody>`;
 }
 
+// ---- rendimiento por anuncio ------------------------------------------------
+
+function renderAdRanking(rows) {
+  const ctx = document.getElementById("chart-ads");
+  const top = rows.slice(0, 12);
+  if (charts.ads) charts.ads.destroy();
+  charts.ads = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: top.map((r) => r.ad),
+      datasets: [
+        {
+          label: "Ventas",
+          data: top.map((r) => r.ventas),
+          backgroundColor: cssVar("--series-4"),
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => top[items[0].dataIndex].ad,
+            label: (c) => {
+              const r = top[c.dataIndex];
+              return [
+                `Conjunto: ${r.adset}`,
+                `Campaña: ${r.campana}`,
+                `Leads: ${fmtInt(r.leadsIngresados)}`,
+                `Ventas: ${fmtInt(r.ventas)}`,
+                `CVR: ${fmtPct(r.cvr)}`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { color: cssVar("--text-muted") }, grid: { color: cssVar("--gridline") } },
+        y: { ticks: { color: cssVar("--text-secondary") }, grid: { display: false } },
+      },
+    },
+  });
+
+  const table = document.getElementById("table-ads");
+  table.innerHTML = `
+    <thead><tr>
+      <th class="left">#</th><th class="left">Anuncio</th><th class="left">Conjunto</th><th class="left">Campaña</th>
+      <th>Plataforma</th><th>Leads</th><th>Gestión.</th><th>Ventas</th><th>Unidades</th>
+      <th>% Gestión</th><th>CVR</th><th>Efect. (vs gestión.)</th>
+    </tr></thead>
+    <tbody>
+      ${rows
+        .map(
+          (r, i) => `<tr>
+            <td class="${i === 0 ? "rank-1" : ""}">${i + 1}</td>
+            <td class="left">${r.ad}</td>
+            <td class="left">${r.adset}</td>
+            <td class="left">${r.campana}</td>
+            <td>${r.platform}</td>
+            <td>${fmtInt(r.leadsIngresados)}</td>
+            <td>${fmtInt(r.gestionados)}</td>
+            <td>${fmtInt(r.ventas)}</td>
+            <td>${fmtInt(r.unidadesVendidas)}</td>
+            <td>${fmtPct(r.pctGestion)}</td>
+            <td>${fmtPct(r.cvr)}</td>
+            <td>${fmtPct(r.efectividadGestion)}</td>
+          </tr>`
+        )
+        .join("")}
+    </tbody>`;
+}
+
+// ---- orquestación ----------------------------------------------------------
+
 function renderAll() {
   const filters = currentFilters();
   renderGeneralKpis(computeGeneralSummary(DASHBOARD_DATA, filters));
@@ -309,6 +406,7 @@ function renderAll() {
   renderTipificaciones(computeTipificaciones(DASHBOARD_DATA, filters));
   renderPlanRanking(computePlanRanking(DASHBOARD_DATA, filters));
   renderAsesores(computeAsesorRanking(DASHBOARD_DATA, filters));
+  renderAdRanking(computeAdRanking(DASHBOARD_DATA, filters));
 
   const sinFecha = applyFilters(DASHBOARD_DATA.leads, { platform: filters.platform, asesor: filters.asesor }).filter(
     (l) => !l.monthKey
@@ -354,6 +452,8 @@ async function loadAndRender() {
   }
 }
 
+// ---- tema claro/oscuro ------------------------------------------------------
+
 function initTheme() {
   const saved = localStorage.getItem("dashboard-theme");
   if (saved) document.documentElement.setAttribute("data-theme", saved);
@@ -362,9 +462,11 @@ function initTheme() {
     const next = cur === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("dashboard-theme", next);
-    renderAll();
+    renderAll(); // los charts leen colores de CSS vars, hay que repintarlos
   });
 }
+
+// ---- init ---------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
