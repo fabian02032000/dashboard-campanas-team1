@@ -149,7 +149,13 @@ function computePlanRanking(data, filters) {
 }
 
 function computeAdRanking(data, filters) {
-  const leads = applyFilters(data.leads, filters);
+  let leads = applyFilters(data.leads, { platform: filters.platform, monthKey: filters.monthKey });
+  if (filters.campana && filters.campana !== "Todos") {
+    leads = leads.filter((l) => l.campanaNombre === filters.campana);
+  }
+  if (filters.adset && filters.adset !== "Todos") {
+    leads = leads.filter((l) => l.adsetNombre === filters.adset);
+  }
   const byAd = new Map();
   leads.forEach((l) => {
     // agrupamos por campaña + conjunto + anuncio: el mismo nombre de
@@ -169,6 +175,18 @@ function computeAdRanking(data, filters) {
 
   rows.sort((a, b) => b.ventas - a.ventas);
   return rows;
+}
+
+function getAvailableCampanas(data) {
+  const set = new Set(data.leads.map((l) => l.campanaNombre).filter(Boolean));
+  return Array.from(set).sort();
+}
+
+function getAvailableAdsets(data, campana) {
+  let leads = data.leads;
+  if (campana && campana !== "Todos") leads = leads.filter((l) => l.campanaNombre === campana);
+  const set = new Set(leads.map((l) => l.adsetNombre).filter(Boolean));
+  return Array.from(set).sort();
 }
 
 function getAvailableMonths(data) {

@@ -51,49 +51,83 @@
   <div id="error-holder"></div>
   <div id="content" style="display:none">
 
-    <h2 class="section-title">Resumen general</h2>
-    <div class="kpi-grid" id="kpi-general"></div>
-
-    <h2 class="section-title">Resumen mensual <span class="hint">leads ingresados vs. vendidos, por mes</span> <span class="hint" id="monthly-caveat"></span></h2>
-    <div class="panel">
-      <div class="chart-box"><canvas id="chart-monthly"></canvas></div>
-    </div>
-    <div class="panel table-scroll" style="margin-top:12px">
-      <table class="data-table" id="table-monthly"></table>
+    <div class="tabs-nav" role="tablist">
+      <button class="tab-btn active" data-tab="general" type="button" role="tab">General</button>
+      <button class="tab-btn" data-tab="anuncios" type="button" role="tab">Rendimiento por anuncio</button>
     </div>
 
-    <h2 class="section-title">Tipificaciones <span class="hint">cómo se cerraron los leads gestionados</span></h2>
-    <div class="grid-2">
+    <div class="tab-panel active" id="tab-general" role="tabpanel">
+
+      <h2 class="section-title">Resumen general</h2>
+      <div class="kpi-grid" id="kpi-general"></div>
+
+      <h2 class="section-title">Resumen mensual <span class="hint">leads ingresados vs. vendidos, por mes</span> <span class="hint" id="monthly-caveat"></span></h2>
       <div class="panel">
-        <div class="chart-box"><canvas id="chart-tipif"></canvas></div>
+        <div class="chart-box"><canvas id="chart-monthly"></canvas></div>
       </div>
+      <div class="panel table-scroll" style="margin-top:12px">
+        <table class="data-table" id="table-monthly"></table>
+      </div>
+
+      <h2 class="section-title">Tipificaciones <span class="hint">cómo se cerraron los leads gestionados</span></h2>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="chart-box"><canvas id="chart-tipif"></canvas></div>
+        </div>
+        <div class="panel">
+          <ul class="legend-list" id="legend-tipif"></ul>
+        </div>
+      </div>
+
+      <h2 class="section-title">Plan más vendido</h2>
       <div class="panel">
-        <ul class="legend-list" id="legend-tipif"></ul>
+        <div class="chart-box short"><canvas id="chart-plan"></canvas></div>
       </div>
+      <div class="panel table-scroll" style="margin-top:12px">
+        <table class="data-table" id="table-plan"></table>
+      </div>
+
+      <h2 class="section-title">Ranking y efectividad por asesor</h2>
+      <div class="panel">
+        <div class="chart-box short"><canvas id="chart-asesor"></canvas></div>
+      </div>
+      <div class="panel table-scroll" style="margin-top:12px">
+        <table class="data-table" id="table-asesor"></table>
+      </div>
+
     </div>
 
-    <h2 class="section-title">Plan más vendido</h2>
-    <div class="panel">
-      <div class="chart-box short"><canvas id="chart-plan"></canvas></div>
-    </div>
-    <div class="panel table-scroll" style="margin-top:12px">
-      <table class="data-table" id="table-plan"></table>
-    </div>
+    <div class="tab-panel" id="tab-anuncios" role="tabpanel">
 
-    <h2 class="section-title">Ranking y efectividad por asesor</h2>
-    <div class="panel">
-      <div class="chart-box short"><canvas id="chart-asesor"></canvas></div>
-    </div>
-    <div class="panel table-scroll" style="margin-top:12px">
-      <table class="data-table" id="table-asesor"></table>
-    </div>
+      <h2 class="section-title">Rendimiento por anuncio <span class="hint">de qué anuncio / conjunto / campaña vino cada lead, y cuál vende más</span></h2>
 
-    <h2 class="section-title">Rendimiento por anuncio <span class="hint">de qué anuncio / conjunto / campaña vino cada lead, y cuál vende más</span></h2>
-    <div class="panel">
-      <div class="chart-box short"><canvas id="chart-ads"></canvas></div>
-    </div>
-    <div class="panel table-scroll" style="margin-top:12px">
-      <table class="data-table" id="table-ads"></table>
+      <div class="filters">
+        <label>Campaña
+          <select id="f-ads-campana">
+            <option value="Todos">Todas</option>
+          </select>
+        </label>
+        <label>Conjunto de anuncios
+          <select id="f-ads-adset">
+            <option value="Todos">Todos</option>
+          </select>
+        </label>
+        <label>Mes
+          <select id="f-ads-month">
+            <option value="Todos">Todos</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="panel ad-highlight" id="ad-highlight"></div>
+
+      <div class="panel" style="margin-top:12px">
+        <div class="chart-box short"><canvas id="chart-ads"></canvas></div>
+      </div>
+      <div class="panel table-scroll" style="margin-top:12px">
+        <table class="data-table" id="table-ads"></table>
+      </div>
+
     </div>
 
   </div>

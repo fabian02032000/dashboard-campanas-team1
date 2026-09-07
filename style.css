@@ -142,6 +142,32 @@ button.icon-btn:hover { background: var(--surface-1); }
   min-width: 160px;
 }
 
+/* ---- tabs ---- */
+.tabs-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow-x: auto;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { color: var(--text-primary); border-bottom-color: var(--series-1); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 /* ---- section titles ---- */
 h2.section-title {
   font-size: 15px;
@@ -184,6 +210,27 @@ h2.section-title .hint { font-weight: 400; color: var(--text-muted); font-size: 
 
 .chart-box { position: relative; height: 320px; }
 .chart-box.short { height: 280px; }
+
+/* ---- destacado de mejor anuncio ---- */
+.ad-highlight {
+  border-left: 3px solid var(--series-4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ad-highlight-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+.ad-highlight-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; }
+.ad-highlight-name { font-size: 19px; font-weight: 700; }
+.ad-highlight-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.ad-highlight-stats { display: flex; gap: 22px; margin-left: auto; }
+.ad-highlight-stats div { font-size: 11.5px; color: var(--text-secondary); text-align: right; }
+.ad-highlight-stats strong { display: block; font-size: 18px; color: var(--text-primary); font-weight: 700; margin-top: 2px; }
 
 /* ---- legend ---- */
 .legend-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

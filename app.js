@@ -49,6 +49,59 @@ function populateFilterOptions() {
   });
 }
 
+// ---- filtros de la pestaña "Rendimiento por anuncio" ------------------------
+// Independientes de los filtros generales (excepto Plataforma, que aplica a
+// todo el dashboard): Campaña, Conjunto de anuncios y Mes.
+
+function currentAdFilters() {
+  return {
+    platform: document.getElementById("f-platform").value,
+    monthKey: document.getElementById("f-ads-month").value,
+    campana: document.getElementById("f-ads-campana").value,
+    adset: document.getElementById("f-ads-adset").value,
+  };
+}
+
+function populateAdFilterOptions() {
+  const campanaSel = document.getElementById("f-ads-campana");
+  const monthSel = document.getElementById("f-ads-month");
+
+  getAvailableCampanas(DASHBOARD_DATA).forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    campanaSel.appendChild(opt);
+  });
+  getAvailableMonths(DASHBOARD_DATA).forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = m.value;
+    opt.textContent = m.label;
+    monthSel.appendChild(opt);
+  });
+  refreshAdsetOptions("Todos");
+}
+
+// El conjunto de anuncios depende de la campaña elegida (cascada): al cambiar
+// la campaña, solo mostramos los conjuntos que existen dentro de ella.
+function refreshAdsetOptions(campana) {
+  const adsetSel = document.getElementById("f-ads-adset");
+  const currentVal = adsetSel.value;
+  const adsets = getAvailableAdsets(DASHBOARD_DATA, campana);
+
+  adsetSel.innerHTML = "";
+  const optTodos = document.createElement("option");
+  optTodos.value = "Todos";
+  optTodos.textContent = "Todos";
+  adsetSel.appendChild(optTodos);
+  adsets.forEach((a) => {
+    const opt = document.createElement("option");
+    opt.value = a;
+    opt.textContent = a;
+    adsetSel.appendChild(opt);
+  });
+  adsetSel.value = adsets.includes(currentVal) ? currentVal : "Todos";
+}
+
 // ---- KPIs generales ------------------------------------------------------
 
 function renderGeneralKpis(k) {
@@ -322,6 +375,30 @@ function renderAsesores(rows) {
 
 // ---- rendimiento por anuncio ------------------------------------------------
 
+// Siempre visible arriba de la pestaña: cuál anuncio vende más dentro del
+// filtro actual (Campaña / Conjunto / Mes / Plataforma).
+function renderAdHighlight(rows) {
+  const el = document.getElementById("ad-highlight");
+  if (!rows.length) {
+    el.innerHTML = `<div class="ad-highlight-label">🏆 Anuncio con más ventas</div><div class="sub">No hay leads para este filtro.</div>`;
+    return;
+  }
+  const top = rows[0];
+  el.innerHTML = `
+    <div class="ad-highlight-label">🏆 Anuncio con más ventas</div>
+    <div class="ad-highlight-row">
+      <div>
+        <div class="ad-highlight-name">${top.ad}</div>
+        <div class="ad-highlight-meta">${top.campana} · ${top.adset} · ${top.platform}</div>
+      </div>
+      <div class="ad-highlight-stats">
+        <div>Ventas<strong>${fmtInt(top.ventas)}</strong></div>
+        <div>Leads<strong>${fmtInt(top.leadsIngresados)}</strong></div>
+        <div>CVR<strong>${fmtPct(top.cvr)}</strong></div>
+      </div>
+    </div>`;
+}
+
 function renderAdRanking(rows) {
   const ctx = document.getElementById("chart-ads");
   const top = rows.slice(0, 12);
@@ -406,13 +483,20 @@ function renderAll() {
   renderTipificaciones(computeTipificaciones(DASHBOARD_DATA, filters));
   renderPlanRanking(computePlanRanking(DASHBOARD_DATA, filters));
   renderAsesores(computeAsesorRanking(DASHBOARD_DATA, filters));
-  renderAdRanking(computeAdRanking(DASHBOARD_DATA, filters));
 
   const sinFecha = applyFilters(DASHBOARD_DATA.leads, { platform: filters.platform, asesor: filters.asesor }).filter(
     (l) => !l.monthKey
   ).length;
   const caveat = document.getElementById("monthly-caveat");
   caveat.textContent = sinFecha > 0 ? `· ${sinFecha.toLocaleString("es-PE")} leads sin fecha en el Sheet (sí cuentan en el resumen general, no aparecen aquí)` : "";
+}
+
+// Pestaña "Rendimiento por anuncio": tiene sus propios filtros (Campaña,
+// Conjunto, Mes) y comparte solo la Plataforma con el resto del dashboard.
+function renderAdsTab() {
+  const rows = computeAdRanking(DASHBOARD_DATA, currentAdFilters());
+  renderAdHighlight(rows);
+  renderAdRanking(rows);
 }
 
 function setStatus(msg, isError) {
@@ -431,8 +515,10 @@ async function loadAndRender() {
       throw new Error("Se conectó al Sheet pero no se encontraron leads. Revisa los nombres de las pestañas en config.js.");
     }
     if (document.getElementById("f-month").options.length <= 1) populateFilterOptions();
+    if (document.getElementById("f-ads-campana").options.length <= 1) populateAdFilterOptions();
     document.getElementById("content").style.display = "block";
     renderAll();
+    renderAdsTab();
     const now = new Date();
     const label = now.toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
     setStatus(`Actualizado: ${label} · ${DASHBOARD_DATA.leads.length.toLocaleString("es-PE")} leads cargados`);
@@ -452,6 +538,26 @@ async function loadAndRender() {
   }
 }
 
+// ---- pestañas (tabs) --------------------------------------------------------
+
+function initTabs() {
+  const buttons = document.querySelectorAll(".tab-btn");
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.classList.contains("active")) return;
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+      // Los gráficos de Chart.js que estaban en una pestaña oculta (display:none)
+      // se crean con tamaño 0, así que hay que forzar un resize al mostrar la pestaña.
+      requestAnimationFrame(() => {
+        Object.values(charts).forEach((c) => c && c.resize());
+      });
+    });
+  });
+}
+
 // ---- tema claro/oscuro ------------------------------------------------------
 
 function initTheme() {
@@ -462,7 +568,9 @@ function initTheme() {
     const next = cur === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("dashboard-theme", next);
-    renderAll(); // los charts leen colores de CSS vars, hay que repintarlos
+    // los charts leen colores de CSS vars, hay que repintar ambas pestañas
+    renderAll();
+    renderAdsTab();
   });
 }
 
@@ -470,9 +578,18 @@ function initTheme() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+  initTabs();
   ["f-platform", "f-month", "f-asesor"].forEach((id) =>
     document.getElementById(id).addEventListener("change", renderAll)
   );
+  // Plataforma es el único filtro que comparten ambas pestañas.
+  document.getElementById("f-platform").addEventListener("change", renderAdsTab);
+  document.getElementById("f-ads-campana").addEventListener("change", () => {
+    refreshAdsetOptions(document.getElementById("f-ads-campana").value);
+    renderAdsTab();
+  });
+  document.getElementById("f-ads-adset").addEventListener("change", renderAdsTab);
+  document.getElementById("f-ads-month").addEventListener("change", renderAdsTab);
   document.getElementById("btn-refresh").addEventListener("click", loadAndRender);
   loadAndRender();
 
