@@ -60,22 +60,40 @@ function monthKey(date) {
 // punto de entrada, y exige la clave secreta.
 
 let _payloadCache = null;
+let _payloadPromise = null; // fetch en curso, compartido por todos los que pidan datos al mismo tiempo
 
+// IMPORTANTE: loadAllLeads() e loadInversion() piden 6 "hojas" distintas en
+// paralelo (4 de leads + 2 de resumen), pero todas viven en el MISMO payload
+// del Apps Script. Si solo cacheáramos el resultado ya resuelto (_payloadCache),
+// las 6 llamadas llegan aquí ANTES de que la primera termine y cada una
+// dispara su propio fetch — 6 peticiones idénticas y pesadas al mismo tiempo,
+// lo que satura el Apps Script y hace que el dashboard tarde muchísimo en
+// cargar (o falle directamente). Por eso también cacheamos la PROMESA en
+// curso: la primera llamada crea el fetch, y las demás simplemente esperan
+// esa misma promesa en vez de crear una nueva.
 async function fetchAppsScriptPayload() {
   if (_payloadCache) return _payloadCache;
+  if (_payloadPromise) return _payloadPromise;
   if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.startsWith("PEGA_AQUI")) {
     throw new Error("Falta configurar APPS_SCRIPT_URL en config.js (ver AppsScript_Code.gs).");
   }
-  const res = await fetch(appsScriptUrl(), { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`No se pudo contactar el Apps Script (HTTP ${res.status}). Revisa que esté implementado como "Aplicación web" con acceso "Cualquier usuario".`);
+  _payloadPromise = (async () => {
+    const res = await fetch(appsScriptUrl(), { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error(`No se pudo contactar el Apps Script (HTTP ${res.status}). Revisa que esté implementado como "Aplicación web" con acceso "Cualquier usuario".`);
+    }
+    const json = await res.json();
+    if (json.error) {
+      throw new Error(`El Apps Script rechazó la petición: ${json.error}. Revisa que APPS_SCRIPT_TOKEN coincida con SECRET_TOKEN en el script.`);
+    }
+    _payloadCache = json;
+    return json;
+  })();
+  try {
+    return await _payloadPromise;
+  } finally {
+    _payloadPromise = null;
   }
-  const json = await res.json();
-  if (json.error) {
-    throw new Error(`El Apps Script rechazó la petición: ${json.error}. Revisa que APPS_SCRIPT_TOKEN coincida con SECRET_TOKEN en el script.`);
-  }
-  _payloadCache = json;
-  return json;
 }
 
 // Nombres de pestañas configuradas que el Apps Script no pudo encontrar en el
