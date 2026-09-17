@@ -474,6 +474,126 @@ function renderAdRanking(rows) {
     </tbody>`;
 }
 
+// ---- venta diaria + promedio de venta diaria por mes ------------------------
+
+function renderDailySales(result) {
+  const { daily, monthly } = result;
+
+  const ctxDaily = document.getElementById("chart-daily-sales");
+  if (charts.dailySales) charts.dailySales.destroy();
+  charts.dailySales = new Chart(ctxDaily, {
+    type: "bar",
+    data: {
+      labels: daily.map((d) => d.date),
+      datasets: [
+        {
+          label: "Venta Mono",
+          data: daily.map((d) => d.mono),
+          backgroundColor: cssVar("--series-1"),
+          stack: "ventas",
+          borderRadius: 3,
+          maxBarThickness: 18,
+        },
+        {
+          label: "Venta Multi",
+          data: daily.map((d) => d.multi),
+          backgroundColor: cssVar("--series-2"),
+          stack: "ventas",
+          borderRadius: 3,
+          maxBarThickness: 18,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "top", labels: { color: cssVar("--text-secondary"), usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            title: (items) => items[0].label,
+            afterTitle: (items) => {
+              const total = daily[items[0].dataIndex].total;
+              return `Total: ${fmtInt(total)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: cssVar("--text-muted"), maxRotation: 60, minRotation: 60, autoSkip: true, maxTicksLimit: 24 },
+          grid: { display: false },
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { color: cssVar("--text-muted"), precision: 0 },
+          grid: { color: cssVar("--gridline") },
+        },
+      },
+    },
+  });
+
+  const ctxMonthly = document.getElementById("chart-daily-sales-avg");
+  if (charts.dailySalesAvg) charts.dailySalesAvg.destroy();
+  charts.dailySalesAvg = new Chart(ctxMonthly, {
+    type: "bar",
+    data: {
+      labels: monthly.map((m) => m.label),
+      datasets: [
+        {
+          label: "Promedio de venta diaria",
+          data: monthly.map((m) => m.promedioDiario),
+          backgroundColor: cssVar("--series-3"),
+          borderRadius: 4,
+          maxBarThickness: 48,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const r = monthly[c.dataIndex];
+              return [
+                `Promedio: ${r.promedioDiario.toFixed(1)} ventas/día`,
+                `Total del mes: ${fmtInt(r.totalVentas)}`,
+                `Días con actividad: ${fmtInt(r.diasActivos)}`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: cssVar("--text-muted") }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: cssVar("--text-muted") }, grid: { color: cssVar("--gridline") } },
+      },
+    },
+  });
+
+  const table = document.getElementById("table-daily-sales-monthly");
+  table.innerHTML = `
+    <thead><tr><th class="left">Mes</th><th>Total ventas</th><th>Días con actividad</th><th>Promedio venta diario</th></tr></thead>
+    <tbody>
+      ${monthly
+        .map(
+          (r) => `<tr>
+            <td class="left">${r.label}</td>
+            <td>${fmtInt(r.totalVentas)}</td>
+            <td>${fmtInt(r.diasActivos)}</td>
+            <td>${r.promedioDiario.toFixed(2)}</td>
+          </tr>`
+        )
+        .join("")}
+    </tbody>`;
+}
+
 // ---- orquestación ----------------------------------------------------------
 
 function renderAll() {
@@ -483,6 +603,7 @@ function renderAll() {
   renderTipificaciones(computeTipificaciones(DASHBOARD_DATA, filters));
   renderPlanRanking(computePlanRanking(DASHBOARD_DATA, filters));
   renderAsesores(computeAsesorRanking(DASHBOARD_DATA, filters));
+  renderDailySales(computeDailySales(DASHBOARD_DATA, filters));
 
   const sinFecha = applyFilters(DASHBOARD_DATA.leads, { platform: filters.platform, asesor: filters.asesor }).filter(
     (l) => !l.monthKey
