@@ -76,8 +76,12 @@ cualquier momento, y es el que decides compartir o no con tu equipo.
 
 - **No hay que hacer nada** para que el dashboard se actualice: cada vez que
   se abre el link, vuelve a leer el Sheet tal cual está en ese momento.
-  También se refresca solo cada 10 minutos si lo dejas abierto en una
-  pestaña (ajustable en `config.js` → `AUTO_REFRESH_MINUTES`).
+  También se refresca solo cada 1 minuto si lo dejas abierto en una pestaña
+  (ajustable en `config.js` → `AUTO_REFRESH_MINUTES`), así el desfase máximo
+  de cualquier dato mostrado es de ~2 minutos. Esto asume que el Apps Script
+  publicado en `APPS_SCRIPT_URL` lee el Sheet en vivo en cada llamada y no
+  cachea internamente por más tiempo que eso — si el script del backend usa
+  `CacheService` con un TTL más largo, hay que bajarlo ahí también.
 - El botón **↻ Actualizar** fuerza una relectura inmediata.
 - Los filtros (Plataforma / Mes / Asesor) recalculan todo en el momento, sin
   volver a pedir datos al Sheet.
@@ -104,6 +108,12 @@ cualquier momento, y es el que decides compartir o no con tu equipo.
 - **Torta de tipificaciones**: se muestran las 7 tipificaciones más
   frecuentes y el resto se agrupa en "Otras" (hay ~20 tipificaciones
   distintas en el Sheet; con todas, la torta sería ilegible).
+- **Venta diaria** (pestaña propia): cuenta ventas por día (mono vs. multi,
+  según si la tipificación contiene "MULTI"), respetando los filtros de
+  Plataforma y Asesor pero mostrando siempre todos los meses. El "promedio
+  de venta diaria por mes" es ventas del mes ÷ días con actividad de leads
+  ese mes (cualquier lead, no solo ventas) — así un mes con pocos días de
+  campaña activa no queda subestimado.
 
 ### Nota de calidad de datos
 
