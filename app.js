@@ -626,15 +626,24 @@ function setStatus(msg, isError) {
   el.classList.toggle("error", !!isError);
 }
 
-async function loadAndRender() {
-  document.getElementById("loading").classList.remove("hidden");
-  document.getElementById("error-holder").innerHTML = "";
+// isBackground=true es el auto-refresh silencioso (setInterval): no tapa el
+// dashboard con el overlay de carga completo (la consulta al Sheet puede
+// tardar 20-30s y sería muy molesto ver la pantalla de carga cada vez que
+// se refresca solo). isBackground=false es la carga inicial o el botón
+// "Actualizar", donde sí queremos el overlay porque no hay nada que mostrar
+// todavía o el usuario pidió explícitamente refrescar.
+async function loadAndRender(isBackground = false) {
+  if (!isBackground) {
+    document.getElementById("loading").classList.remove("hidden");
+    document.getElementById("error-holder").innerHTML = "";
+  }
   try {
-    setStatus("Cargando…");
-    DASHBOARD_DATA = await loadDashboardData();
-    if (!DASHBOARD_DATA.leads.length) {
+    setStatus(isBackground ? "Actualizando en segundo plano…" : "Cargando…");
+    const freshData = await loadDashboardData();
+    if (!freshData.leads.length) {
       throw new Error("Se conectó al Sheet pero no se encontraron leads. Revisa los nombres de las pestañas en config.js.");
     }
+    DASHBOARD_DATA = freshData;
     if (document.getElementById("f-month").options.length <= 1) populateFilterOptions();
     if (document.getElementById("f-ads-campana").options.length <= 1) populateAdFilterOptions();
     document.getElementById("content").style.display = "block";
@@ -645,17 +654,28 @@ async function loadAndRender() {
     setStatus(`Actualizado: ${label} · ${DASHBOARD_DATA.leads.length.toLocaleString("es-PE")} leads cargados`);
     document.getElementById("footer-updated").textContent = `Última carga: ${label}`;
 
-    const missing = await getMissingSheets();
-    if (missing.length) {
-      document.getElementById("error-holder").innerHTML =
-        `<div class="error-box">⚠️ No se encontró ${missing.length === 1 ? "esta pestaña" : "estas pestañas"} en el Sheet — sus leads NO están contados arriba: ${missing.map((m) => `"${m}"`).join(", ")}. Revisa que el nombre en config.js coincida exactamente con el nombre real de la pestaña.</div>`;
+    if (!isBackground) {
+      const missing = await getMissingSheets();
+      if (missing.length) {
+        document.getElementById("error-holder").innerHTML =
+          `<div class="error-box">⚠️ No se encontró ${missing.length === 1 ? "esta pestaña" : "estas pestañas"} en el Sheet — sus leads NO están contados arriba: ${missing.map((m) => `"${m}"`).join(", ")}. Revisa que el nombre en config.js coincida exactamente con el nombre real de la pestaña.</div>`;
+      }
     }
   } catch (err) {
     console.error(err);
-    setStatus("Error al cargar datos", true);
-    document.getElementById("error-holder").innerHTML = `<div class="error-box">⚠️ ${err.message}</div>`;
+    if (isBackground) {
+      // No tapamos el dashboard que ya está visible: solo avisamos en la
+      // línea de estado que el último refresco automático falló, y se
+      // sigue mostrando la última carga buena hasta el próximo intento.
+      const now = new Date();
+      const label = now.toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
+      setStatus(`⚠️ No se pudo refrescar (${label}) — mostrando la última carga buena`, true);
+    } else {
+      setStatus("Error al cargar datos", true);
+      document.getElementById("error-holder").innerHTML = `<div class="error-box">⚠️ ${err.message}</div>`;
+    }
   } finally {
-    document.getElementById("loading").classList.add("hidden");
+    if (!isBackground) document.getElementById("loading").classList.add("hidden");
   }
 }
 
@@ -711,10 +731,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("f-ads-adset").addEventListener("change", renderAdsTab);
   document.getElementById("f-ads-month").addEventListener("change", renderAdsTab);
-  document.getElementById("btn-refresh").addEventListener("click", loadAndRender);
-  loadAndRender();
+  // Nota: no pasar loadAndRender directo como callback del click, porque
+  // addEventListener le pasaría el Event como primer argumento y eso se
+  // leería como isBackground=true (truthy) y ocultaría el overlay de carga
+  // que sí queremos ver cuando el usuario pide refrescar a propósito.
+  document.getElementById("btn-refresh").addEventListener("click", () => loadAndRender(false));
+  loadAndRender(false);
 
   if (CONFIG.AUTO_REFRESH_MINUTES > 0) {
-    setInterval(loadAndRender, CONFIG.AUTO_REFRESH_MINUTES * 60 * 1000);
+    setInterval(() => loadAndRender(true), CONFIG.AUTO_REFRESH_MINUTES * 60 * 1000);
   }
 });
