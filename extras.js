@@ -1,11 +1,13 @@
 // ============================================================================
 // extras.js — Complemento del dashboard (se carga DESPUÉS de app.js)
 //   1) Suma la hoja "SMR | LEADS META | V.3" a las hojas de leads (plataforma Meta).
-//   2) Pestaña "Llegada de leads": picos por hora, volumen por día y mapa de
-//      calor día-de-semana × hora. Se puede ver general o por TikTok / Meta
-//      (usa el filtro Plataforma de arriba).
-//   3) SLA (dentro de General, con desplegable horario L-S 9-18 / 24 h): minutos hábiles (L-S 9:00-18:00, hora de Lima) entre que
-//      llega el lead y que lo tipifican CONTACTO / NO CONTACTO.
+//   2) TODO queda dentro de la pestaña General (no se crean pestañas nuevas):
+//        - Resumen de arriba: + "Venta diaria del mes" y + "SLA (mediana)".
+//        - Venta diaria (se mueve desde su pestaña antigua).
+//        - SLA de tipificación, con desplegable: horario de atención (L-S 9:00-18:00,
+//          hora de Lima) o 24 horas corridas.
+//        - Llegada de leads: picos por hora, volumen por día, calendario del mes
+//          (mapa de calor) y mapa de calor día x hora. Usa los filtros de arriba.
 // No toca los archivos existentes: solo se agrega <script src="extras.js">
 // al final de index.html (después de app.js).
 // ============================================================================
@@ -151,100 +153,41 @@
       while (vd.firstChild) gen.appendChild(vd.firstChild);
       vd.remove();
     }
-    gen.appendChild(sla); // orden en General: ... Venta diaria, luego SLA
+    gen.appendChild(sla); // orden en General: ... Venta diaria, SLA, Llegada de leads
+    var arr = document.createElement("div");
+    arr.id = "arr-block";
+    arr.innerHTML =
+      '<h2 class="section-title">Llegada de leads' + hint("a qué hora y qué días llegan; respeta Plataforma y Mes de arriba") + "</h2>" +
+      '<div class="kpi-grid" id="kpi-arr"></div>' +
+      '<h2 class="section-title">Picos por hora' + hint("cuántos leads llegan en cada hora del día (hora de Lima)") + "</h2>" +
+      '<div class="panel"><div class="chart-box"><canvas id="chart-arr-hour"></canvas></div></div>' +
+      '<h2 class="section-title">Volumen de leads por día' + hint("leads que ingresan cada día") + "</h2>" +
+      '<div class="panel"><div class="chart-box"><canvas id="chart-arr-daily"></canvas></div></div>' +
+      '<h2 class="section-title">Mapa de calor del mes' + hint("cada casilla es un día: más oscuro = más leads. Con Mes = Todos se muestra el último mes") + "</h2>" +
+      '<div class="panel table-scroll"><table class="data-table" id="table-arr-cal"></table></div>' +
+      '<h2 class="section-title">Mapa de calor' + hint("día de la semana × hora: más oscuro = más leads") + "</h2>" +
+      '<div class="panel table-scroll"><table class="data-table" id="table-arr-heat"></table></div>' +
+      '<h2 class="section-title">Leads por hora' + hint("detalle numérico") + "</h2>" +
+      '<div class="panel table-scroll"><table class="data-table" id="table-arr-hour"></table></div>' +
+      '<div class="hint" id="arr-caveat" style="margin-top:8px"></div>';
+    gen.appendChild(arr);
     var vb = document.querySelector('.tab-btn[data-tab="venta-diaria"]');
     if (vb) vb.remove();
   }
 
-  // ---- 3) inyectar pestañas ------------------------------------------------------
+  // ---- 3) armar General -------------------------------------------------------------
   function injectTabs() {
-    var nav = document.querySelector(".tabs-nav");
-    var lastPanel = document.querySelector(".tab-panel:last-of-type") || document.querySelector(".tab-panel");
-    if (!nav || !lastPanel || document.getElementById("tab-llegadas")) return;
-
-    function addTab(key, label, html) {
-      var btn = document.createElement("button");
-      btn.className = "tab-btn";
-      btn.dataset.tab = key;
-      btn.textContent = label;
-      nav.appendChild(btn);
-      var panel = document.createElement("div");
-      panel.className = "tab-panel";
-      panel.id = "tab-" + key;
-      panel.innerHTML = html;
-      var panels = document.querySelectorAll(".tab-panel");
-      panels[panels.length - 1].insertAdjacentElement("afterend", panel);
-      return btn;
-    }
-
-    addTab(
-      "llegadas",
-      "Llegada de leads",
-      '<div class="filters"><label>Mes <select id="f-arr-month"><option value="Todos">Todos</option></select></label></div>' +
-        '<h2 class="section-title">Resumen de llegada' + hint("respeta el filtro Plataforma de arriba (Todas / Meta / TikTok)") + "</h2>" +
-        '<div class="kpi-grid" id="kpi-arr"></div>' +
-        '<h2 class="section-title">Picos por hora' + hint("cuántos leads llegan en cada hora del día (hora de Lima)") + "</h2>" +
-        '<div class="panel"><div class="chart-box"><canvas id="chart-arr-hour"></canvas></div></div>' +
-        '<h2 class="section-title">Volumen de leads por día' + hint("leads que ingresan cada día") + "</h2>" +
-        '<div class="panel"><div class="chart-box"><canvas id="chart-arr-daily"></canvas></div></div>' +
-        '<h2 class="section-title">Mapa de calor del mes' + hint("cada casilla es un día del mes: más claro = más leads. Sirve para comparar los días de la semana") + "</h2>" +
-        '<div class="panel table-scroll"><table class="data-table" id="table-arr-cal"></table></div>' +
-        '<h2 class="section-title">Mapa de calor' + hint("día de la semana × hora: más oscuro = más leads") + "</h2>" +
-        '<div class="panel table-scroll"><table class="data-table" id="table-arr-heat"></table></div>' +
-        '<h2 class="section-title">Leads por hora' + hint("detalle numérico") + "</h2>" +
-        '<div class="panel table-scroll"><table class="data-table" id="table-arr-hour"></table></div>' +
-        '<div class="hint" id="arr-caveat" style="margin-top:8px"></div>'
-    );
-
+    if (document.getElementById("sla-block")) return;
     injectGeneral();
-
-    var buttons = document.querySelectorAll(".tab-btn");
-    var mine = { llegadas: true };
-    buttons.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        if (mine[btn.dataset.tab]) {
-          if (btn.classList.contains("active")) return;
-          document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-          btn.classList.add("active");
-          document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
-          document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-          requestAnimationFrame(function () {
-            if (typeof charts !== "undefined") Object.values(charts).forEach(function (c) { c && c.resize(); });
-          });
-        } else {
-          // el manejador original ya activó su pestaña; solo apagamos las nuevas
-          ["llegadas"].forEach(function (k) {
-            var b = document.querySelector('.tab-btn[data-tab="' + k + '"]');
-            if (b) b.classList.remove("active");
-            var p = document.getElementById("tab-" + k);
-            if (p) p.classList.remove("active");
-          });
-        }
-      });
+    if (!document.getElementById("sla-block")) return;
+    ["f-platform", "f-month", "f-asesor", "f-sla-mode"].forEach(function (id) {
+      document.getElementById(id).addEventListener("change", renderExtras);
     });
-
-    document.getElementById("f-platform").addEventListener("change", renderExtras);
-    document.getElementById("f-arr-month").addEventListener("change", renderExtras);
-    document.getElementById("f-month").addEventListener("change", renderExtras);
-    document.getElementById("f-asesor").addEventListener("change", renderExtras);
-    document.getElementById("f-sla-mode").addEventListener("change", renderExtras);
     var themeBtn = document.getElementById("btn-theme");
     if (themeBtn) themeBtn.addEventListener("click", function () { setTimeout(renderExtras, 0); });
   }
 
   // ---- 4) render ------------------------------------------------------------------
-  function fillMonthSelect(id) {
-    var sel = document.getElementById(id);
-    if (!sel || sel.options.length > 1) return;
-    monthOptions().forEach(function (m) {
-      var o = document.createElement("option");
-      o.value = m.value; o.textContent = m.label; sel.appendChild(o);
-    });
-    // por defecto: el mes más reciente (más útil para operar el día a día)
-    var opts = monthOptions();
-    if (opts.length) sel.value = opts[opts.length - 1].value;
-  }
-
   function scoped(monthSelId) {
     var plat = platformFilter();
     var mk = document.getElementById(monthSelId).value;
@@ -260,7 +203,7 @@
   }
 
   function renderArrivals() {
-    var all = scoped("f-arr-month");
+    var all = scoped("f-month");
     var leads = all.filter(function (l) { return l.arrivalMs !== undefined; });
     var sinHora = all.length - leads.length;
     var plat = platformFilter();
@@ -346,7 +289,7 @@
     });
 
     // calendario del mes (semanas en filas, días de la semana en columnas)
-    var calMonth = document.getElementById("f-arr-month").value;
+    var calMonth = document.getElementById("f-month").value;
     if (calMonth === "Todos" && days.length) calMonth = days[days.length - 1].slice(0, 7); // sin mes elegido: el más reciente
     var calTable = document.getElementById("table-arr-cal");
     if (!calMonth || calMonth === "Todos") {
@@ -400,7 +343,7 @@
     document.getElementById("table-arr-hour").innerHTML = th + "<tbody>" + tb + "</tbody>";
 
     document.getElementById("arr-caveat").textContent = sinHora > 0
-      ? sinHora.toLocaleString("es-PE") + " leads de este filtro no traen hora exacta de llegada en el Sheet (solo fecha) y no aparecen en esta pestaña."
+      ? sinHora.toLocaleString("es-PE") + " leads de este filtro no traen hora exacta de llegada en el Sheet (solo fecha) y no aparecen en esta sección."
       : "";
   }
 
@@ -409,8 +352,7 @@
     { label: "30–60 min", max: 60 }, { label: "1–2 h", max: 120 }, { label: "> 2 h", max: Infinity },
   ];
 
-  function renderSla() {
-    // Filtros: los generales de arriba (Plataforma / Mes / Asesor) + el desplegable de horario
+  function slaScope() {
     var plat = platformFilter();
     var mk = document.getElementById("f-month").value;
     var as = document.getElementById("f-asesor").value;
@@ -422,13 +364,45 @@
     });
     var mode = document.getElementById("f-sla-mode").value; // "hab" = L-S 9-18 | "24" = reloj corrido
     var field = mode === "24" ? "sla24" : "slaHab";
+    var medidos = all.filter(function (l) { return l[field] !== null && l[field] !== undefined; });
+    return { all: all, mode: mode, field: field, medidos: medidos, vals: medidos.map(function (l) { return l[field]; }) };
+  }
+
+  // Resumen de arriba: venta diaria del mes + SLA
+  function renderSummary() {
+    var grid = document.getElementById("kpi-general");
+    if (!grid) return;
+    grid.querySelectorAll("[data-ex]").forEach(function (n) { n.remove(); });
+    var html = "";
+    if (typeof computeDailySales === "function") {
+      var ds = computeDailySales(EX.data, { platform: platformFilter(), asesor: document.getElementById("f-asesor").value });
+      var mk = document.getElementById("f-month").value;
+      var row = mk !== "Todos" ? ds.monthly.filter(function (m) { return m.monthKey === mk; })[0] : ds.monthly[ds.monthly.length - 1];
+      html += row
+        ? tile("Venta diaria · " + row.label, row.promedioDiario.toFixed(1) + " / día", fInt(row.totalVentas) + " ventas en " + row.diasActivos + " días con leads")
+        : tile("Venta diaria", "—", "sin datos para este filtro");
+    }
+    var st = slaScope();
+    var enMeta = st.vals.filter(function (v) { return v <= SLA_OBJ_MIN; }).length;
+    html += tile(
+      "SLA · mediana (" + (st.mode === "24" ? "24 h" : "L-S 9–18") + ")",
+      fMin(median(st.vals)),
+      st.vals.length ? fPct(enMeta / st.vals.length) + " dentro de " + SLA_OBJ_MIN + " min · " + fInt(st.vals.length) + " medidos" : "aún sin tipificaciones medidas"
+    );
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    Array.prototype.slice.call(tmp.children).forEach(function (n) { n.setAttribute("data-ex", "1"); grid.appendChild(n); });
+  }
+
+  function renderSla() {
+    var st = slaScope();
+    var all = st.all, mode = st.mode, field = st.field;
     document.getElementById("sla-hint").textContent =
       (mode === "24"
         ? "minutos corridos (las 24 h del día) desde que llega el lead hasta que se tipifica CONTACTO / NO CONTACTO"
         : "minutos dentro del horario de atención (L-S, 9:00–18:00 Lima) desde que llega el lead hasta que se tipifica CONTACTO / NO CONTACTO") +
       "; meta: " + SLA_OBJ_MIN + " min";
-    var medidos = all.filter(function (l) { return l[field] !== null && l[field] !== undefined; });
-    var vals = medidos.map(function (l) { return l[field]; });
+    var medidos = st.medidos, vals = st.vals;
     var pendientes = all.filter(function (l) { return !l.gestionado; }).length;
     var enMeta = vals.filter(function (v) { return v <= SLA_OBJ_MIN; }).length;
     var en60 = vals.filter(function (v) { return v <= 60; }).length;
@@ -477,7 +451,7 @@
     try {
       if (!EX.data) return;
       injectTabs();
-      fillMonthSelect("f-arr-month");
+      renderSummary();
       renderArrivals();
       renderSla();
     } catch (err) {
