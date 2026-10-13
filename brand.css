@@ -1,0 +1,246 @@
+/* ============================================================================
+   brand.css — Estilo de marca Sales & Marketing Revolution (Manual de marca v1.0)
+   Se carga DESPUÉS de style.css y solo cambia colores, tipografía y detalles
+   visuales. Paleta: morado #7B00D3 (principal) · verde lima #C6FF00 (acento) ·
+   negro #000000 y blanco #FFFFFF (base) · grises #181818 / #222222 (apoyo) ·
+   morado claro #B26BFF (para texto/íconos sobre negro).
+   Tipografía: Inter (títulos Bold, textos Regular, etiquetas Semibold en mayúsculas).
+   ========================================================================== */
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --brand: #7b00d3;
+  --brand-soft: #b26bff;
+  --lime: #c6ff00;
+}
+
+/* ---------- Tema oscuro (por defecto en la marca) ---------- */
+:root:not([data-theme="light"]),
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #181818;
+  --surface-2: #222222;
+  --page: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #cfcdd8;
+  --text-muted: #8e8c99;
+  --gridline: #2a2a30;
+  --baseline: #3b3b44;
+  --border: rgba(255, 255, 255, 0.1);
+  --success: #c6ff00;
+  --critical: #ff5a5f;
+  --accent: #c6ff00;       /* pestaña activa, resaltes */
+  --accent-ink: #000000;
+  --label: #b26bff;        /* etiquetas en mayúsculas */
+  --heat: #7b00d3;         /* mapas de calor */
+
+  --series-1: #b26bff;
+  --series-2: #c6ff00;
+  --series-3: #38c6f4;
+  --series-4: #edebf2;
+  --series-5: #ff8a3d;
+  --series-6: #2ee6a6;
+  --series-7: #5b8cff;
+  --series-8: #ff5fa2;
+
+  --seq-450: #7b00d3;
+  --seq-300: #b26bff;
+  --seq-150: #dcc2ff;
+}
+
+/* ---------- Tema claro ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface-1: #f7f4fb;
+  --surface-2: #ffffff;
+  --page: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #4a4852;
+  --text-muted: #7a7885;
+  --gridline: #e6e3ec;
+  --baseline: #cfcad9;
+  --border: rgba(11, 11, 11, 0.12);
+  --success: #3f6b00;
+  --critical: #d03b3b;
+  --accent: #7b00d3;
+  --accent-ink: #ffffff;
+  --label: #7b00d3;
+  --heat: #7b00d3;
+
+  --series-1: #7b00d3;
+  --series-2: #5e8f00;
+  --series-3: #0e8fb5;
+  --series-4: #1a1a1a;
+  --series-5: #e0600a;
+  --series-6: #0a9a6b;
+  --series-7: #2f5be0;
+  --series-8: #d6246e;
+
+  --seq-450: #7b00d3;
+  --seq-300: #b26bff;
+  --seq-150: #e3cffa;
+}
+
+/* ---------- Base ---------- */
+body {
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  background:
+    radial-gradient(55% 45% at 88% -8%, rgba(123, 0, 211, 0.32), transparent 70%),
+    radial-gradient(35% 30% at 0% 100%, rgba(198, 255, 0, 0.05), transparent 70%),
+    var(--page);
+  background-attachment: fixed;
+}
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(55% 40% at 90% -10%, rgba(123, 0, 211, 0.1), transparent 70%),
+    var(--page);
+  background-attachment: fixed;
+}
+select, button, input { font-family: var(--font-sans); }
+
+/* ---------- Encabezado con logo ---------- */
+header.top { align-items: center; margin-bottom: 26px; gap: 20px; }
+.brand-block { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.brand-logo { width: 132px; height: auto; display: block; flex: none; }
+.logo-on-light { display: none; }
+:root[data-theme="light"] .logo-on-dark { display: none; }
+:root[data-theme="light"] .logo-on-light { display: block; }
+.head-text { border-left: 2px solid var(--brand); padding-left: 22px; }
+.eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--label); margin-bottom: 6px;
+}
+header.top h1 {
+  font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 6px;
+}
+header.top h1 .dot { color: var(--lime); }
+:root[data-theme="light"] header.top h1 .dot { color: var(--brand); }
+header.top .sub { color: var(--text-secondary); font-size: 13px; }
+@media (max-width: 640px) {
+  .head-text { border-left: 0; padding-left: 0; }
+  header.top h1 { font-size: 24px; }
+}
+
+button.icon-btn {
+  border-radius: 6px; font-weight: 600; letter-spacing: 0.01em;
+  transition: border-color 0.15s, color 0.15s;
+}
+button.icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface-2); }
+
+/* ---------- Filtros ---------- */
+.filters {
+  border-radius: 8px;
+  border-left: 3px solid var(--brand);
+  background: var(--surface-1);
+}
+.filters label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--label);
+}
+.filters select {
+  border-radius: 6px; font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none;
+}
+.filters select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Pestañas ---------- */
+.tabs-nav { border-bottom-color: var(--border); }
+.tab-btn { font-weight: 600; letter-spacing: 0.01em; }
+.tab-btn.active { color: var(--text-primary); border-bottom-color: var(--accent); border-bottom-width: 3px; }
+
+/* ---------- Títulos de sección: raya morada como en el manual ---------- */
+h2.section-title {
+  font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin: 38px 0 14px;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0;
+}
+h2.section-title::before {
+  content: ""; display: inline-block; width: 22px; height: 2px; background: var(--brand);
+  margin-right: 12px; align-self: center; flex: none;
+}
+h2.section-title .hint { font-weight: 400; font-size: 12px; letter-spacing: 0; }
+
+/* ---------- Tarjetas (KPIs y paneles) ---------- */
+.kpi-tile {
+  border-radius: 6px; border-top: 2px solid var(--brand); background: var(--surface-1);
+}
+.kpi-tile .label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--label);
+}
+.kpi-tile .value { font-weight: 700; letter-spacing: -0.03em; font-size: 27px; }
+.kpi-tile .value.small { font-size: 21px; }
+/* Tarjetas que suma extras.js (venta diaria del mes y SLA): acento lima */
+.kpi-tile[data-ex] { border-top-color: var(--lime); }
+:root[data-theme="light"] .kpi-tile[data-ex] { border-top-color: var(--accent); }
+
+.panel { border-radius: 6px; background: var(--surface-1); }
+
+/* ---------- Tablas ---------- */
+table.data-table thead th {
+  color: var(--label); font-size: 10.5px; letter-spacing: 0.1em; border-bottom: 1px solid var(--baseline);
+}
+table.data-table tbody tr:hover { background: var(--surface-2); }
+table.data-table td.rank-1 { color: var(--success); font-weight: 700; }
+
+/* ---------- Destacado de anuncio ---------- */
+.ad-highlight { border-left: 3px solid var(--lime); }
+:root[data-theme="light"] .ad-highlight { border-left-color: var(--brand); }
+.ad-highlight-label { color: var(--label); letter-spacing: 0.12em; }
+.ad-highlight-name { letter-spacing: -0.02em; }
+
+/* ---------- Carga ---------- */
+.loading-overlay { gap: 18px; }
+.loading-logo { width: 150px; height: auto; margin-bottom: 4px; }
+.spinner { border-color: var(--gridline); border-top-color: var(--lime); }
+:root[data-theme="light"] .spinner { border-top-color: var(--brand); }
+
+/* ---------- Pie y crédito "Un desarrollo de Sales & Marketing Revolution" ---------- */
+footer.foot { border-top-color: var(--border); }
+
+.credit {
+  margin-top: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1);
+  padding: 28px 28px 24px; position: relative; overflow: hidden;
+}
+.credit::before { /* brillo morado difuso del manual */
+  content: ""; position: absolute; right: -80px; top: -120px; width: 380px; height: 380px; pointer-events: none;
+  background: radial-gradient(circle, rgba(123, 0, 211, 0.38), transparent 68%);
+}
+:root[data-theme="light"] .credit::before { background: radial-gradient(circle, rgba(123, 0, 211, 0.12), transparent 68%); }
+.credit > * { position: relative; }
+
+.credit-flow { display: flex; margin: 4px 0 30px; }
+.credit-flow .fl-step { flex: 1; text-align: center; position: relative; }
+.credit-flow .fl-step::before { /* línea de flujo que une los puntos */
+  content: ""; position: absolute; top: 6px; left: 0; right: 0; height: 2px; background: var(--brand);
+}
+.credit-flow .fl-step:first-child::before { left: 50%; }
+.credit-flow .fl-step:last-child::before { right: 50%; }
+.credit-flow .fl-dot {
+  position: relative; z-index: 1; display: block; width: 14px; height: 14px; margin: 0 auto 10px;
+  border-radius: 50%; border: 2px solid var(--brand); background: var(--surface-1);
+}
+.credit-flow .fl-step:last-child .fl-dot {
+  background: var(--lime); border-color: var(--lime); box-shadow: 0 0 0 5px rgba(198, 255, 0, 0.16);
+}
+:root[data-theme="light"] .credit-flow .fl-step:last-child .fl-dot {
+  background: var(--brand); border-color: var(--brand); box-shadow: 0 0 0 5px rgba(123, 0, 211, 0.16);
+}
+.credit-flow .fl-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-primary);
+}
+.credit-flow .fl-step:last-child .fl-label { color: var(--lime); }
+:root[data-theme="light"] .credit-flow .fl-step:last-child .fl-label { color: var(--brand); }
+
+.credit-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.credit-logo { width: 140px; height: auto; flex: none; }
+.credit-text { flex: 1; min-width: 220px; }
+.credit-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--label); margin-bottom: 6px; }
+.credit-name { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.credit-tag { margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+.credit-tag strong { font-weight: 600; color: var(--text-primary); }
+.credit-tag .dot { color: var(--lime); font-weight: 800; }
+:root[data-theme="light"] .credit-tag .dot { color: var(--brand); }
+.credit-tags { font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--label); text-align: right; }
+@media (max-width: 640px) {
+  .credit { padding: 22px 18px; }
+  .credit-flow .fl-label { font-size: 8.5px; letter-spacing: 0.08em; }
+  .credit-tags { text-align: left; }
+}
