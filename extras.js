@@ -4,7 +4,7 @@
 //   2) Pestaña "Llegada de leads": picos por hora, volumen por día y mapa de
 //      calor día-de-semana × hora. Se puede ver general o por TikTok / Meta
 //      (usa el filtro Plataforma de arriba).
-//   3) Pestaña "SLA": minutos hábiles (L-V 9:00-18:00, hora de Lima) entre que
+//   3) SLA (dentro de General, con desplegable horario L-S 9-18 / 24 h): minutos hábiles (L-S 9:00-18:00, hora de Lima) entre que
 //      llega el lead y que lo tipifican CONTACTO / NO CONTACTO.
 // No toca los archivos existentes: solo se agrega <script src="extras.js">
 // al final de index.html (después de app.js).
@@ -14,7 +14,7 @@
 
   // ---- ajustes ---------------------------------------------------------------
   var LIMA_OFFSET_MS = -5 * 3600 * 1000; // Lima = UTC-5, sin horario de verano
-  var HORA_INI = 9, HORA_FIN = 18;       // horario de atención (L-V)
+  var HORA_INI = 9, HORA_FIN = 18;       // horario de atención (L-S)
   var SLA_OBJ_MIN = (typeof CONFIG !== "undefined" && CONFIG.SLA_OBJETIVO_MIN) || 15; // meta del SLA en minutos hábiles
   var DOW_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
   var DOW_ORDER = [1, 2, 3, 4, 5, 6, 0]; // se muestra Lun → Dom
@@ -36,6 +36,25 @@
   }
 
   // ---- 2) campos nuevos en cada lead (hora de llegada + SLA) --------------------
+  // Minutos dentro del horario de atención (lunes a sábado, 9:00-18:00 hora de Lima) entre dos instantes.
+  function businessMinutes(startMs, endMs) {
+    if (!(endMs > startMs)) return 0;
+    var cursor = startMs + LIMA_OFFSET_MS, end = endMs + LIMA_OFFSET_MS, total = 0, guard = 0;
+    while (cursor < end && guard < 2000) {
+      guard++;
+      var d = new Date(cursor);
+      var dow = d.getUTCDay();
+      var dayStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      if (dow >= 1 && dow <= 6) {
+        var a = Math.max(cursor, dayStart + HORA_INI * 3600000);
+        var b = Math.min(end, dayStart + HORA_FIN * 3600000);
+        if (b > a) total += b - a;
+      }
+      cursor = dayStart + 24 * 3600000;
+    }
+    return Math.round((total / 60000) * 10) / 10;
+  }
+
   function parseArrivalMs(r, sheetCfg) {
     var ct = r["Creation time"]; // TikTok: segundos Unix (UTC)
     if (ct !== undefined && ct !== null && ct !== "" && !isNaN(Number(ct)) && Number(ct) > 1e9) return Number(ct) * 1000;
@@ -60,8 +79,20 @@
         l.arrDow = d.getUTCDay();
         l.arrDay = d.toISOString().slice(0, 10);
       }
-      var sla = r["SLA (min)"];
-      l.slaMin = sla === "" || sla === null || sla === undefined || isNaN(Number(sla)) ? null : Number(sla);
+      // SLA: minutos hábiles (L-S 9-18) y minutos corridos (24 h) entre la llegada y la tipificación
+      var tipRaw = r["Fecha Tipificación"];
+      var tipMs = tipRaw ? Date.parse(String(tipRaw)) : NaN;
+      l.tipMs = isNaN(tipMs) ? null : tipMs;
+      var sheetSla = r["SLA (min)"];
+      sheetSla = sheetSla === "" || sheetSla === null || sheetSla === undefined || isNaN(Number(sheetSla)) ? null : Number(sheetSla);
+      l.sla24 = null;
+      l.slaHab = null;
+      if (l.tipMs !== null && ms !== null && l.tipMs > ms) {
+        l.sla24 = (l.tipMs - ms) / 60000;
+        l.slaHab = businessMinutes(ms, l.tipMs);
+      } else if (sheetSla !== null) {
+        l.slaHab = sheetSla; // el Sheet ya calculó los minutos hábiles
+      }
     }
     return out;
   };
@@ -97,6 +128,34 @@
   function destroy(key) { if (typeof charts !== "undefined" && charts[key]) { charts[key].destroy(); delete charts[key]; } }
   function hint(t) { return ' <span class="hint">' + t + "</span>"; }
 
+  // Venta diaria y SLA viven dentro de la pestaña General (no hay pestañas aparte).
+  var generalDone = false;
+  function injectGeneral() {
+    if (generalDone) return;
+    var gen = document.getElementById("tab-general");
+    if (!gen) return;
+    generalDone = true;
+    var sla = document.createElement("div");
+    sla.id = "sla-block";
+    sla.innerHTML =
+      '<h2 class="section-title">SLA de tipificación <span class="hint" id="sla-hint"></span></h2>' +
+      '<div class="filters"><label>Horario del SLA <select id="f-sla-mode">' +
+      '<option value="hab">Horario de atención (L-S 9:00–18:00)</option>' +
+      '<option value="24">24 horas del día (reloj corrido)</option></select></label></div>' +
+      '<div class="kpi-grid" id="kpi-sla"></div>' +
+      '<div class="hint" id="sla-empty" style="margin:8px 0"></div>' +
+      '<div class="panel"><div class="chart-box short"><canvas id="chart-sla-dist"></canvas></div></div>' +
+      '<div class="panel table-scroll" style="margin-top:12px"><table class="data-table" id="table-sla-asesor"></table></div>';
+    var vd = document.getElementById("tab-venta-diaria");
+    if (vd) {
+      while (vd.firstChild) gen.appendChild(vd.firstChild);
+      vd.remove();
+    }
+    gen.appendChild(sla); // orden en General: ... Venta diaria, luego SLA
+    var vb = document.querySelector('.tab-btn[data-tab="venta-diaria"]');
+    if (vb) vb.remove();
+  }
+
   // ---- 3) inyectar pestañas ------------------------------------------------------
   function injectTabs() {
     var nav = document.querySelector(".tabs-nav");
@@ -128,6 +187,8 @@
         '<div class="panel"><div class="chart-box"><canvas id="chart-arr-hour"></canvas></div></div>' +
         '<h2 class="section-title">Volumen de leads por día' + hint("leads que ingresan cada día") + "</h2>" +
         '<div class="panel"><div class="chart-box"><canvas id="chart-arr-daily"></canvas></div></div>' +
+        '<h2 class="section-title">Mapa de calor del mes' + hint("cada casilla es un día del mes: más claro = más leads. Sirve para comparar los días de la semana") + "</h2>" +
+        '<div class="panel table-scroll"><table class="data-table" id="table-arr-cal"></table></div>' +
         '<h2 class="section-title">Mapa de calor' + hint("día de la semana × hora: más oscuro = más leads") + "</h2>" +
         '<div class="panel table-scroll"><table class="data-table" id="table-arr-heat"></table></div>' +
         '<h2 class="section-title">Leads por hora' + hint("detalle numérico") + "</h2>" +
@@ -135,22 +196,10 @@
         '<div class="hint" id="arr-caveat" style="margin-top:8px"></div>'
     );
 
-    addTab(
-      "sla",
-      "SLA",
-      '<div class="filters"><label>Mes <select id="f-sla-month"><option value="Todos">Todos</option></select></label></div>' +
-        '<h2 class="section-title">SLA de tipificación' +
-        hint("minutos hábiles (L-V, 9:00–18:00 Lima) desde que llega el lead hasta que se tipifica CONTACTO / NO CONTACTO; meta: " + SLA_OBJ_MIN + " min") + "</h2>" +
-        '<div class="kpi-grid" id="kpi-sla"></div>' +
-        '<div class="hint" id="sla-empty" style="margin:8px 0"></div>' +
-        '<h2 class="section-title">Distribución del tiempo de respuesta</h2>' +
-        '<div class="panel"><div class="chart-box short"><canvas id="chart-sla-dist"></canvas></div></div>' +
-        '<h2 class="section-title">SLA por asesor</h2>' +
-        '<div class="panel table-scroll"><table class="data-table" id="table-sla-asesor"></table></div>'
-    );
+    injectGeneral();
 
     var buttons = document.querySelectorAll(".tab-btn");
-    var mine = { llegadas: true, sla: true };
+    var mine = { llegadas: true };
     buttons.forEach(function (btn) {
       btn.addEventListener("click", function () {
         if (mine[btn.dataset.tab]) {
@@ -164,7 +213,7 @@
           });
         } else {
           // el manejador original ya activó su pestaña; solo apagamos las nuevas
-          ["llegadas", "sla"].forEach(function (k) {
+          ["llegadas"].forEach(function (k) {
             var b = document.querySelector('.tab-btn[data-tab="' + k + '"]');
             if (b) b.classList.remove("active");
             var p = document.getElementById("tab-" + k);
@@ -176,7 +225,9 @@
 
     document.getElementById("f-platform").addEventListener("change", renderExtras);
     document.getElementById("f-arr-month").addEventListener("change", renderExtras);
-    document.getElementById("f-sla-month").addEventListener("change", renderExtras);
+    document.getElementById("f-month").addEventListener("change", renderExtras);
+    document.getElementById("f-asesor").addEventListener("change", renderExtras);
+    document.getElementById("f-sla-mode").addEventListener("change", renderExtras);
     var themeBtn = document.getElementById("btn-theme");
     if (themeBtn) themeBtn.addEventListener("click", function () { setTimeout(renderExtras, 0); });
   }
@@ -226,7 +277,7 @@
       heat[l.arrDow][l.arrHour]++;
       if (!daily[l.arrDay]) daily[l.arrDay] = { Meta: 0, TikTok: 0 };
       daily[l.arrDay][l.platform]++;
-      var habil = l.arrDow >= 1 && l.arrDow <= 5 && l.arrHour >= HORA_INI && l.arrHour < HORA_FIN;
+      var habil = l.arrDow >= 1 && l.arrDow <= 6 && l.arrHour >= HORA_INI && l.arrHour < HORA_FIN;
       if (!habil) fuera++;
     });
     var totalHour = new Array(24).fill(0);
@@ -244,7 +295,7 @@
         tile("Día de la semana pico", DOW_LABELS[peakDow], fInt(dowTotals[peakDow]) + " leads") +
         tile("Promedio de leads por día", (leads.length / days.length).toFixed(1), days.length + " días con leads") +
         tile("Día con más leads", maxDayIdx >= 0 ? days[maxDayIdx].slice(8, 10) + "/" + days[maxDayIdx].slice(5, 7) : "—", maxDayIdx >= 0 ? fInt(perDay[maxDayIdx]) + " leads" : "") +
-        tile("Llegan fuera de horario", fPct(fuera / leads.length), "fuera de L-V " + HORA_INI + ":00–" + HORA_FIN + ":00")
+        tile("Llegan fuera de horario", fPct(fuera / leads.length), "fuera de L-S " + HORA_INI + ":00–" + HORA_FIN + ":00")
       : tile("Sin datos", "—", "no hay leads con hora de llegada para este filtro");
 
     // gráfico por hora
@@ -294,6 +345,42 @@
       },
     });
 
+    // calendario del mes (semanas en filas, días de la semana en columnas)
+    var calMonth = document.getElementById("f-arr-month").value;
+    if (calMonth === "Todos" && days.length) calMonth = days[days.length - 1].slice(0, 7); // sin mes elegido: el más reciente
+    var calTable = document.getElementById("table-arr-cal");
+    if (!calMonth || calMonth === "Todos") {
+      calTable.innerHTML = "<tbody><tr><td class=\"left\">Sin datos</td></tr></tbody>";
+    } else {
+      var cy = +calMonth.slice(0, 4), cm = +calMonth.slice(5, 7);
+      var first = new Date(Date.UTC(cy, cm - 1, 1));
+      var nDays = new Date(Date.UTC(cy, cm, 0)).getUTCDate();
+      var offset = (first.getUTCDay() + 6) % 7; // lunes = 0
+      var counts = {};
+      leads.forEach(function (l) { if (l.arrDay.slice(0, 7) === calMonth) counts[l.arrDay] = (counts[l.arrDay] || 0) + 1; });
+      var maxDay = Math.max(1, Math.max.apply(null, Object.keys(counts).map(function (k) { return counts[k]; }).concat([0])));
+      var weeks = Math.ceil((offset + nDays) / 7);
+      var dowSum = [0, 0, 0, 0, 0, 0, 0], dowN = [0, 0, 0, 0, 0, 0, 0];
+      var rowsHtml = "";
+      for (var w = 0; w < weeks; w++) {
+        var tr = "<tr><td class=\"left\">Sem " + (w + 1) + "</td>";
+        for (var c = 0; c < 7; c++) {
+          var dayNum = w * 7 + c - offset + 1;
+          if (dayNum < 1 || dayNum > nDays) { tr += "<td></td>"; continue; }
+          var key = calMonth + "-" + String(dayNum).padStart(2, "0");
+          var v = counts[key] || 0;
+          dowSum[c] += v; dowN[c]++;
+          var pctc = Math.round((v / maxDay) * 100);
+          tr += '<td style="background:color-mix(in srgb, ' + css("--series-1") + " " + pctc + '%, transparent);text-align:center;min-width:64px"><div style="font-size:11px;opacity:.7">' + dayNum + "</div><strong>" + (v || "·") + "</strong></td>";
+        }
+        rowsHtml += tr + "</tr>";
+      }
+      var dowNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+      var avgRow = "<tr><td class=\"left\"><strong>Promedio</strong></td>" + dowSum.map(function (t, i) { return "<td style=\"text-align:center\"><strong>" + (dowN[i] ? (t / dowN[i]).toFixed(1) : "—") + "</strong></td>"; }).join("") + "</tr>";
+      var totRow = "<tr><td class=\"left\"><strong>Total</strong></td>" + dowSum.map(function (t) { return "<td style=\"text-align:center\"><strong>" + fInt(t) + "</strong></td>"; }).join("") + "</tr>";
+      calTable.innerHTML = "<thead><tr><th class=\"left\">" + CONFIG.MESES_NOMBRE[cm] + " " + cy + "</th>" + dowNames.map(function (n) { return "<th>" + n + "</th>"; }).join("") + "</tr></thead><tbody>" + rowsHtml + avgRow + totRow + "</tbody>";
+    }
+
     // mapa de calor
     var maxCell = Math.max(1, Math.max.apply(null, heat.map(function (r) { return Math.max.apply(null, r); })));
     var head = "<thead><tr><th class=\"left\">Día</th>" + labelsH.map(function (l) { return "<th>" + l.slice(0, 2) + "</th>"; }).join("") + "<th>Total</th></tr></thead>";
@@ -323,9 +410,25 @@
   ];
 
   function renderSla() {
-    var all = scoped("f-sla-month");
-    var medidos = all.filter(function (l) { return l.slaMin !== null && l.slaMin !== undefined; });
-    var vals = medidos.map(function (l) { return l.slaMin; });
+    // Filtros: los generales de arriba (Plataforma / Mes / Asesor) + el desplegable de horario
+    var plat = platformFilter();
+    var mk = document.getElementById("f-month").value;
+    var as = document.getElementById("f-asesor").value;
+    var all = EX.data.leads.filter(function (l) {
+      if (plat !== "Todos" && l.platform !== plat) return false;
+      if (mk !== "Todos" && l.monthKey !== mk) return false;
+      if (as !== "Todos" && l.asesor !== as) return false;
+      return true;
+    });
+    var mode = document.getElementById("f-sla-mode").value; // "hab" = L-S 9-18 | "24" = reloj corrido
+    var field = mode === "24" ? "sla24" : "slaHab";
+    document.getElementById("sla-hint").textContent =
+      (mode === "24"
+        ? "minutos corridos (las 24 h del día) desde que llega el lead hasta que se tipifica CONTACTO / NO CONTACTO"
+        : "minutos dentro del horario de atención (L-S, 9:00–18:00 Lima) desde que llega el lead hasta que se tipifica CONTACTO / NO CONTACTO") +
+      "; meta: " + SLA_OBJ_MIN + " min";
+    var medidos = all.filter(function (l) { return l[field] !== null && l[field] !== undefined; });
+    var vals = medidos.map(function (l) { return l[field]; });
     var pendientes = all.filter(function (l) { return !l.gestionado; }).length;
     var enMeta = vals.filter(function (v) { return v <= SLA_OBJ_MIN; }).length;
     var en60 = vals.filter(function (v) { return v <= 60; }).length;
@@ -358,7 +461,7 @@
     });
 
     var by = {};
-    medidos.forEach(function (l) { (by[l.asesor] = by[l.asesor] || []).push(l.slaMin); });
+    medidos.forEach(function (l) { (by[l.asesor] = by[l.asesor] || []).push(l[field]); });
     var rows = Object.keys(by).map(function (a) {
       var v = by[a];
       return { asesor: a, n: v.length, med: median(v), avg: mean(v), meta: v.filter(function (x) { return x <= SLA_OBJ_MIN; }).length / v.length };
@@ -375,7 +478,6 @@
       if (!EX.data) return;
       injectTabs();
       fillMonthSelect("f-arr-month");
-      fillMonthSelect("f-sla-month");
       renderArrivals();
       renderSla();
     } catch (err) {
