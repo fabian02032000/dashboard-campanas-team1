@@ -118,6 +118,9 @@
     return (n / 60).toFixed(1) + " h";
   };
   var css = function (v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); };
+  var heatColor = function () { return css("--heat") || css("--series-1"); }; // color de los mapas de calor (morado de marca)
+  // Tipografía de marca (Inter) también dentro de los gráficos
+  if (typeof Chart !== "undefined" && Chart.defaults && Chart.defaults.font) Chart.defaults.font.family = '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif';
   function median(arr) {
     if (!arr.length) return null;
     var s = arr.slice().sort(function (a, b) { return a - b; });
@@ -163,9 +166,9 @@
       '<div class="panel"><div class="chart-box"><canvas id="chart-arr-hour"></canvas></div></div>' +
       '<h2 class="section-title">Volumen de leads por día' + hint("leads que ingresan cada día") + "</h2>" +
       '<div class="panel"><div class="chart-box"><canvas id="chart-arr-daily"></canvas></div></div>' +
-      '<h2 class="section-title">Mapa de calor del mes' + hint("cada casilla es un día: más oscuro = más leads. Con Mes = Todos se muestra el último mes") + "</h2>" +
+      '<h2 class="section-title">Mapa de calor del mes' + hint("cada casilla es un día: más intenso = más leads. Con Mes = Todos se muestra el último mes") + "</h2>" +
       '<div class="panel table-scroll"><table class="data-table" id="table-arr-cal"></table></div>' +
-      '<h2 class="section-title">Mapa de calor' + hint("día de la semana × hora: más oscuro = más leads") + "</h2>" +
+      '<h2 class="section-title">Mapa de calor' + hint("día de la semana × hora: más intenso = más leads") + "</h2>" +
       '<div class="panel table-scroll"><table class="data-table" id="table-arr-heat"></table></div>' +
       '<h2 class="section-title">Leads por hora' + hint("detalle numérico") + "</h2>" +
       '<div class="panel table-scroll"><table class="data-table" id="table-arr-hour"></table></div>' +
@@ -314,7 +317,7 @@
           var v = counts[key] || 0;
           dowSum[c] += v; dowN[c]++;
           var pctc = Math.round((v / maxDay) * 100);
-          tr += '<td style="background:color-mix(in srgb, ' + css("--series-1") + " " + pctc + '%, transparent);text-align:center;min-width:64px"><div style="font-size:11px;opacity:.7">' + dayNum + "</div><strong>" + (v || "·") + "</strong></td>";
+          tr += '<td style="background:color-mix(in srgb, ' + heatColor() + " " + pctc + '%, transparent);text-align:center;min-width:64px"><div style="font-size:11px;opacity:.7">' + dayNum + "</div><strong>" + (v || "·") + "</strong></td>";
         }
         rowsHtml += tr + "</tr>";
       }
@@ -330,7 +333,7 @@
     var body = DOW_ORDER.map(function (d) {
       return "<tr><td class=\"left\">" + DOW_LABELS[d] + "</td>" + heat[d].map(function (v) {
         var pct = Math.round((v / maxCell) * 100);
-        return '<td style="background:color-mix(in srgb, ' + css("--series-1") + " " + pct + '%, transparent);text-align:center">' + (v || "") + "</td>";
+        return '<td style="background:color-mix(in srgb, ' + heatColor() + " " + pct + '%, transparent);text-align:center">' + (v || "") + "</td>";
       }).join("") + "<td><strong>" + fInt(dowTotals[d]) + "</strong></td></tr>";
     }).join("");
     document.getElementById("table-arr-heat").innerHTML = head + "<tbody>" + body + "</tbody>";
@@ -423,7 +426,7 @@
     vals.forEach(function (v) { for (var i = 0; i < BUCKETS.length; i++) { if (v <= BUCKETS[i].max) { counts[i]++; break; } } });
     charts.slaDist = new Chart(document.getElementById("chart-sla-dist"), {
       type: "bar",
-      data: { labels: BUCKETS.map(function (b) { return b.label; }), datasets: [{ label: "Leads", data: counts, backgroundColor: css("--series-3"), borderRadius: 4, maxBarThickness: 56 }] },
+      data: { labels: BUCKETS.map(function (b) { return b.label; }), datasets: [{ label: "Leads", data: counts, backgroundColor: css("--series-1"), borderRadius: 4, maxBarThickness: 56 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return fInt(c.raw) + " leads (" + fPct(vals.length ? c.raw / vals.length : null) + ")"; } } } },
