@@ -1,30 +1,41 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Dashboard de Campañas — Meta & TikTok</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>" />
+<meta name="theme-color" content="#000000" />
+<title>Dashboard de Gestión — Sales &amp; Marketing Revolution</title>
+<link rel="icon" type="image/png" href="favicon-sm.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="brand.css" />
 <script src="chart.umd.min.js"></script>
 </head>
 <body>
 
 <div class="loading-overlay" id="loading">
+<img class="loading-logo" src="logo-sm-blanco.png" alt="Sales &amp; Marketing Revolution" />
 <div class="spinner"></div>
 <div>Cargando datos del Google Sheet…</div>
 </div>
 
 <div class="wrap">
 <header class="top">
-<div>
-<h1>📊 Dashboard de Gestión — Meta &amp; TikTok</h1>
+<div class="brand-block">
+<img class="brand-logo logo-on-dark" src="logo-sm-blanco.png" alt="Sales &amp; Marketing Revolution" />
+<img class="brand-logo logo-on-light" src="logo-sm-morado.png" alt="Sales &amp; Marketing Revolution" />
+<div class="head-text">
+<div class="eyebrow">Meta &amp; TikTok · en vivo</div>
+<h1>Dashboard de gestión<span class="dot">.</span></h1>
 <div class="sub">Leads, ventas y efectividad del equipo, en vivo desde el Google Sheet</div>
 <div id="status-line">—</div>
 </div>
+</div>
 <div class="top-actions">
 <button class="icon-btn" id="btn-refresh">↻ Actualizar</button>
-<button class="icon-btn" id="btn-theme">🌓 Tema</button>
+<button class="icon-btn" id="btn-theme">◐ Tema</button>
 </div>
 </header>
 
@@ -154,13 +165,34 @@
 <span>Fuente: Google Sheet (pestañas de leads Meta/TikTok + resumen de inversión).</span>
 <span id="footer-updated"></span>
 </footer>
+
+<section class="credit" aria-label="Crédito de desarrollo">
+<div class="credit-flow" aria-hidden="true">
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">Audiencia</span></div>
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">Pauta</span></div>
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">Lead</span></div>
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">CRM</span></div>
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">Asesor</span></div>
+<div class="fl-step"><span class="fl-dot"></span><span class="fl-label">Conversión</span></div>
+</div>
+<div class="credit-row">
+<img class="credit-logo logo-on-dark" src="logo-sm-blanco.png" alt="Sales &amp; Marketing Revolution" />
+<img class="credit-logo logo-on-light" src="logo-sm-morado.png" alt="Sales &amp; Marketing Revolution" />
+<div class="credit-text">
+<div class="credit-eyebrow">Un desarrollo de</div>
+<div class="credit-name">Sales &amp; Marketing Revolution</div>
+<div class="credit-tag">De la pauta a la conversión<span class="dot">.</span></div>
+</div>
+<div class="credit-tags">Meta Ads · TikTok Ads · CRM · Data</div>
+</div>
+</section>
 </div>
 
 <script src="config.js"></script>
 <script src="data.js"></script>
 <script src="metrics.js"></script>
 <script src="app.js"></script>
-<!-- NUEVO: pestañas "Llegada de leads" y "SLA" + hoja V.3 (subir extras.js junto a este archivo) -->
+<!-- Complemento: hoja V.3, SLA, llegada de leads y venta diaria dentro de General (subir extras.js junto a este archivo) -->
 <script src="extras.js"></script>
 </body>
 </html>
