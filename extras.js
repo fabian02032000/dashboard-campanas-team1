@@ -151,6 +151,27 @@
       '<div class="hint" id="sla-empty" style="margin:8px 0"></div>' +
       '<div class="panel"><div class="chart-box short"><canvas id="chart-sla-dist"></canvas></div></div>' +
       '<div class="panel table-scroll" style="margin-top:12px"><table class="data-table" id="table-sla-asesor"></table></div>';
+    var ag = document.createElement("div");
+    ag.id = "ag-block";
+    ag.innerHTML =
+      '<h2 class="section-title">Clientes agendados <span class="hint" id="ag-hint"></span></h2>' +
+      '<div id="ag-alert"></div>' +
+      '<div class="kpi-grid" id="kpi-ag"></div>' +
+      '<div class="panel table-scroll" style="margin-top:12px"><table class="data-table" id="table-ag"></table></div>';
+    var kg = document.getElementById("kpi-general");
+    if (kg && kg.parentNode === gen) gen.insertBefore(ag, kg.nextSibling); else gen.insertBefore(ag, gen.firstChild);
+    var st = document.createElement("style");
+    st.textContent =
+      "#ag-alert .ag-banner{border-radius:6px;padding:10px 14px;margin:6px 0 10px;font-size:13.5px;line-height:1.5;border:1px solid var(--critical);background:color-mix(in srgb,var(--critical) 12%,transparent)}" +
+      "#ag-alert .ag-banner.ok{border-color:var(--success);background:color-mix(in srgb,var(--success) 12%,transparent)}" +
+      "#ag-alert .ag-banner b{color:var(--critical)}#ag-alert .ag-banner.ok b{color:var(--success)}" +
+      "#table-ag td.ag-over,#table-ag td.ag-over strong{color:var(--critical)}" +
+      "#table-ag .ag-bar{display:inline-block;width:120px;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;vertical-align:middle;margin-right:8px}" +
+      "#table-ag .ag-bar i{display:block;height:100%;border-radius:4px}" +
+      "#table-ag .ag-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid currentColor}" +
+      "#table-ag .ag-c-red{color:var(--critical)}#table-ag .ag-c-org{color:#ff9f1c}#table-ag .ag-c-ok{color:var(--success)}" +
+      "#table-ag tfoot td{font-weight:700;border-top:2px solid var(--border,rgba(128,128,128,.4))}";
+    document.head.appendChild(st);
     var vd = document.getElementById("tab-venta-diaria");
     if (vd) {
       while (vd.firstChild) gen.appendChild(vd.firstChild);
@@ -450,6 +471,63 @@
       }).join("") : "<tr><td class=\"left\" colspan=\"5\">Sin datos todavía</td></tr>") + "</tbody>";
   }
 
+
+  // ---- Clientes agendados (estado actual; no depende de los filtros de arriba) ----------
+  var AG_MAX = 10;
+  var MESES_N = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  function escHtml(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function renderAgendados() {
+    var tb = document.getElementById("table-ag");
+    if (!tb || !EX.data) return;
+    var nowL = new Date(Date.now() + LIMA_OFFSET_MS), meses = [];
+    for (var k = 2; k >= 0; k--) {
+      var d = new Date(Date.UTC(nowL.getUTCFullYear(), nowL.getUTCMonth() - k, 1));
+      meses.push({ key: d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0"), label: MESES_N[d.getUTCMonth()] + " " + d.getUTCFullYear() });
+    }
+    var by = {}, monthTot = {};
+    meses.forEach(function (m) { monthTot[m.key] = 0; });
+    EX.data.leads.forEach(function (l) {
+      if (!l.tipificacion || !/AGENDADO/i.test(l.tipificacion)) return;
+      if (monthTot[l.monthKey] === undefined) return;
+      var a = l.asesor || "Sin asignar";
+      by[a] = by[a] || { asesor: a, m: {}, total: 0 };
+      by[a].m[l.monthKey] = (by[a].m[l.monthKey] || 0) + 1;
+      by[a].total++;
+      monthTot[l.monthKey]++;
+    });
+    var rows = Object.keys(by).map(function (a) { return by[a]; }).sort(function (x, y) { return y.total - x.total || x.asesor.localeCompare(y.asesor); });
+    var grand = rows.reduce(function (s, r) { return s + r.total; }, 0);
+    var over = rows.filter(function (r) { return r.total > AG_MAX; });
+    var atMax = rows.filter(function (r) { return r.total === AG_MAX; });
+    var topM = meses.slice().sort(function (a, b) { return monthTot[b.key] - monthTot[a.key]; })[0];
+    document.getElementById("ag-hint").textContent = "estado actual · máximo " + AG_MAX + " por asesor · no cambia con los filtros de arriba";
+    document.getElementById("ag-alert").innerHTML = over.length
+      ? '<div class="ag-banner"><b>⚠ En falta:</b> ' + over.length + (over.length === 1 ? " asesor pasa" : " asesores pasan") + " el máximo de " + AG_MAX + " agendados — " +
+        over.map(function (r) { return "<strong>" + escHtml(r.asesor) + "</strong> (" + r.total + ", +" + (r.total - AG_MAX) + ")"; }).join(" · ") + ".</div>"
+      : '<div class="ag-banner ok"><b>✓ Todo en orden:</b> ningún asesor pasa el máximo de ' + AG_MAX + " agendados.</div>";
+    document.getElementById("kpi-ag").innerHTML =
+      tile("Total agendados", fInt(grand), 'tipificados "CLIENTE AGENDADO (NO TOCAR)"') +
+      tile("Asesor con más", rows.length ? fInt(rows[0].total) : "—", rows.length ? escHtml(rows[0].asesor) : "sin datos") +
+      tile("Mes con más", fInt(monthTot[topM.key]), topM.label) +
+      tile("Asesores en alerta", fInt(over.length + atMax.length), over.length + " en falta · " + atMax.length + " en el máximo");
+    var head = "<thead><tr><th class=\"left\">Asesor</th>" + meses.map(function (m) { return "<th>" + m.label + "</th>"; }).join("") +
+      "<th>Total (x / " + AG_MAX + ")</th><th class=\"left\">Uso del máximo</th><th class=\"left\">Estado</th></tr></thead>";
+    var body = rows.map(function (r) {
+      var cls = r.total > AG_MAX ? "red" : r.total === AG_MAX ? "org" : "ok";
+      var color = cls === "red" ? "var(--critical)" : cls === "org" ? "#ff9f1c" : "var(--success)";
+      var pct = Math.round(r.total / AG_MAX * 100);
+      var estado = cls === "red" ? "En falta · +" + (r.total - AG_MAX) + " sobre el máximo" : cls === "org" ? "Advertencia · en el máximo" : "Dentro del máximo · quedan " + (AG_MAX - r.total);
+      return "<tr><td class=\"left" + (cls === "red" ? " ag-over" : "") + "\"><strong>" + escHtml(r.asesor) + "</strong></td>" +
+        meses.map(function (m) { return "<td>" + (r.m[m.key] || 0) + "</td>"; }).join("") +
+        "<td class=\"" + (cls === "red" ? "ag-over" : "") + "\"><strong>" + r.total + " / " + AG_MAX + "</strong></td>" +
+        "<td class=\"left\"><span class=\"ag-bar\"><i style=\"width:" + Math.min(100, pct) + "%;background:" + color + "\"></i></span>" + pct + "%</td>" +
+        "<td class=\"left\"><span class=\"ag-badge ag-c-" + cls + "\">" + estado + "</span></td></tr>";
+    }).join("");
+    var foot = "<tfoot><tr><td class=\"left\">Total equipo</td>" + meses.map(function (m) { return "<td>" + monthTot[m.key] + "</td>"; }).join("") +
+      "<td>" + grand + "</td><td></td><td></td></tr></tfoot>";
+    tb.innerHTML = head + "<tbody>" + (rows.length ? body : "<tr><td class=\"left\" colspan=\"" + (meses.length + 4) + "\">Sin agendados en estos meses</td></tr>") + "</tbody>" + foot;
+  }
+
   function renderExtras() {
     try {
       if (!EX.data) return;
@@ -457,6 +535,7 @@
       renderSummary();
       renderArrivals();
       renderSla();
+      renderAgendados();
     } catch (err) {
       console.error("extras.js:", err);
     }
